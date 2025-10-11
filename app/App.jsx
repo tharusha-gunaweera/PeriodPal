@@ -4,10 +4,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import 'react-native-gesture-handler';
 
-// Import BottomTabNavigator instead of Home
+// Import screens
 import LoginScreen from './screens/auth/SignIn/SignIn';
 import SignUpScreen from './screens/auth/Signup/SignUp';
 import CommunityListScreen from './screens/Community/CommunityListScreen';
+import CommunityChatScreen from './screens/Community/CommunityChatScreen';
+import CommunityLocationView from './screens/Community/CommunityLocationView'; // Add this import
 import BottomTabNavigator from './screens/navigation/BottomTabNavigator';
 import OnboardingScreen from './screens/OnboardingScreen';
 import SplashScreen from './screens/SplashScreen';
@@ -18,7 +20,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(null);
 
-  // 🔹 Check AsyncStorage for existing user
   useEffect(() => {
     const checkLogin = async () => {
       try {
@@ -28,6 +29,8 @@ export default function App() {
       } catch (error) {
         console.log('Error reading user data:', error);
         setIsLoggedIn(false);
+      } finally {
+        setTimeout(() => setIsLoading(false), 1000);
       }
     };
     checkLogin();
@@ -39,31 +42,76 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          animation: 'slide_from_right'
+        }}
+      >
         {isLoggedIn ? (
-          // 🔹 Show BottomTabNavigator if logged in
-          <Stack.Screen name="MainApp" component={BottomTabNavigator} />
+          // User is logged in - show main app with tabs
+          <>
+            <Stack.Screen name="MainApp" component={BottomTabNavigator} />
+            
+            {/* Community screens that can be accessed from anywhere in the app */}
+            <Stack.Screen
+              name="CommunityList"
+              component={CommunityListScreen}
+              options={{
+                title: 'Communities',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              }}
+            />
+            
+            <Stack.Screen
+              name="CommunityChat"
+              component={CommunityChatScreen}
+              options={({ route }) => ({
+                title: route.params?.communityName || 'Chat',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              })}
+            />
+            
+            {/* Add CommunityLocationView screen */}
+            <Stack.Screen
+              name="CommunityLocationView"
+              component={CommunityLocationView}
+              options={({ route }) => ({
+                title: `${route.params?.communityName || 'Community'} Location`,
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              })}
+            />
+          </>
         ) : (
-          // Otherwise show onboarding + auth flow
+          // User is not logged in - show auth flow
           <>
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="SignUp" component={SignUpScreen} />
+            
+            {/* Allow access to communities even when not logged in (read-only) */}
+            <Stack.Screen
+              name="CommunityList"
+              component={CommunityListScreen}
+              options={{
+                title: 'Communities',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              }}
+            />
           </>
         )}
-
-        {/* 🔹 Community screens - can be accessed from anywhere */}
-        <Stack.Screen
-          name="CommunityList"
-          component={CommunityListScreen}
-          options={{
-            title: 'Communities',
-            headerStyle: { backgroundColor: '#EC4899' },
-            headerTintColor: '#FFFFFF',
-            headerShown: true,
-          }}
-        />
-       
       </Stack.Navigator>
     </NavigationContainer>
   );

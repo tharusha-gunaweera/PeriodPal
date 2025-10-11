@@ -21,10 +21,12 @@ import {
     arrayUnion, 
     arrayRemove, 
     increment, 
-    serverTimestamp 
+    serverTimestamp,
+    getDoc
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { db, auth } from '../../../FirebaseConfig';
+import { db } from '../../../FirebaseConfig';
+import LocationPickerMap from './LocationPickerMap';
 
 const CommunityListScreen = ({ navigation }) => {
     const [communities, setCommunities] = useState([]);
@@ -32,6 +34,7 @@ const CommunityListScreen = ({ navigation }) => {
     const [joining, setJoining] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
 
     // Create community form state
@@ -39,23 +42,16 @@ const CommunityListScreen = ({ navigation }) => {
         name: '',
         description: '',
         locationData: '',
+        locationPin: null,
         isPublic: true
     });
 
     useEffect(() => {
-        // Get current user
         const user = getAuth().currentUser;
         setCurrentUser(user);
-        
-        // Load communities from Firebase
         loadCommunities();
-        
-        // Set up real-time listener
         const unsubscribe = setupCommunityListener();
-        
-        return () => {
-            if (unsubscribe) unsubscribe();
-        };
+        return () => unsubscribe();
     }, []);
 
     // Real-time listener for communities
@@ -84,7 +80,6 @@ const CommunityListScreen = ({ navigation }) => {
     const loadCommunities = async () => {
         try {
             const querySnapshot = await getDocs(collection(db, 'communities'));
-
             const communitiesData = [];
             querySnapshot.forEach((doc) => {
                 communitiesData.push({
@@ -92,7 +87,6 @@ const CommunityListScreen = ({ navigation }) => {
                     ...doc.data()
                 });
             });
-
             setCommunities(communitiesData);
             setLoading(false);
         } catch (error) {
@@ -100,6 +94,23 @@ const CommunityListScreen = ({ navigation }) => {
             Alert.alert('Error', 'Failed to load communities');
             setLoading(false);
         }
+    };
+
+    // Handle location selection from map
+    const handleLocationSelect = (location) => {
+        setCommunityForm(prev => ({
+            ...prev,
+            locationData: `${location.landmark} - ${location.address}`,
+            locationPin: {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                address: location.address,
+                landmark: location.landmark,
+                description: location.description
+            }
+        }));
+        setShowLocationPicker(false);
+        Alert.alert('Location Selected', `You've selected ${location.landmark} as the delivery location`);
     };
 
     // Create community function
@@ -121,18 +132,17 @@ const CommunityListScreen = ({ navigation }) => {
                 Name: communityForm.name,
                 Description: communityForm.description,
                 LocationData: communityForm.locationData,
+                locationPin: communityForm.locationPin,
                 creator: currentUser.uid,
                 Members: [currentUser.uid],
                 isPublic: communityForm.isPublic,
                 memberCount: 1,
                 createdAt: serverTimestamp(),
-                image: '👥'
+                image: '👥',
+                emergencyPins: []
             };
 
-            // Add community to Firestore
             const docRef = await addDoc(collection(db, 'communities'), communityData);
-
-            console.log('Community created with ID:', docRef.id);
             
             Alert.alert('Success', 'Community created successfully!');
             setShowCreateModal(false);
@@ -158,6 +168,16 @@ const CommunityListScreen = ({ navigation }) => {
         try {
             const communityRef = doc(db, 'communities', communityId);
             
+            // Check if user is already a member
+            const communityDoc = await getDoc(communityRef);
+            const communityData = communityDoc.data();
+            
+            if (communityData.Members && communityData.Members.includes(currentUser.uid)) {
+                Alert.alert('Info', 'You are already a member of this community');
+                setJoining(null);
+                return;
+            }
+
             // Add user to members array
             await updateDoc(communityRef, {
                 Members: arrayUnion(currentUser.uid),
@@ -215,12 +235,28 @@ const CommunityListScreen = ({ navigation }) => {
             name: '',
             description: '',
             locationData: '',
+            locationPin: null,
             isPublic: true
         });
     };
 
-    const handleOpenChat = (communityId) => {
-        navigation.navigate('CommunityChat', { communityId });
+    const handleOpenChat = (community) => {
+        navigation.navigate('CommunityChat', { 
+            communityId: community.id,
+            communityName: community.Name 
+        });
+    };
+
+    const handleViewLocation = (community) => {
+        if (community.locationPin) {
+            navigation.navigate('CommunityLocationView', {
+                communityId: community.id,
+                communityName: community.Name,
+                locationPin: community.locationPin
+            });
+        } else {
+            Alert.alert('Info', 'No location pin set for this community');
+        }
     };
 
     const renderCommunityItem = ({ item }) => {
@@ -235,15 +271,19 @@ const CommunityListScreen = ({ navigation }) => {
                         <Text style={styles.communityName}>{item.Name}</Text>
                         <Text style={styles.communityDescription}>{item.Description}</Text>
                         {item.LocationData && (
-                            <Text style={styles.locationText}>📍 {item.LocationData}</Text>
+                            <TouchableOpacity onPress={() => handleViewLocation(item)}>
+                                <Text style={styles.locationText}>📍 {item.LocationData}</Text>
+                            </TouchableOpacity>
                         )}
                         <Text style={styles.memberCount}>{item.memberCount || 1} members</Text>
-                        <Text style={styles.privacyBadge}>
-                            {item.isPublic ? 'Public' : 'Private'}
-                        </Text>
-                        {isCreator && (
-                            <Text style={styles.creatorBadge}>👑 Admin</Text>
-                        )}
+                        <View style={styles.badgeContainer}>
+                            <Text style={styles.privacyBadge}>
+                                {item.isPublic ? '🌍 Public' : '🔒 Private'}
+                            </Text>
+                            {isCreator && (
+                                <Text style={styles.creatorBadge}>👑 Admin</Text>
+                            )}
+                        </View>
                     </View>
                 </View>
 
@@ -264,9 +304,9 @@ const CommunityListScreen = ({ navigation }) => {
                         <View style={styles.memberActions}>
                             <TouchableOpacity
                                 style={styles.chatButton}
-                                onPress={() => handleOpenChat(item.id)}
+                                onPress={() => handleOpenChat(item)}
                             >
-                                <Text style={styles.chatButtonText}>Open Chat</Text>
+                                <Text style={styles.chatButtonText}>💬 Open Chat</Text>
                             </TouchableOpacity>
                             
                             {!isCreator && (
@@ -321,6 +361,12 @@ const CommunityListScreen = ({ navigation }) => {
                         <Text style={styles.emptySubText}>
                             Be the first to create a community!
                         </Text>
+                        <TouchableOpacity
+                            style={styles.createFirstButton}
+                            onPress={() => setShowCreateModal(true)}
+                        >
+                            <Text style={styles.createFirstButtonText}>Create First Community</Text>
+                        </TouchableOpacity>
                     </View>
                 }
             />
@@ -336,13 +382,14 @@ const CommunityListScreen = ({ navigation }) => {
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Create Community</Text>
                         
-                        <ScrollView style={styles.formContainer}>
+                        <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
                             {/* Community Name */}
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>Community Name *</Text>
                                 <TextInput
                                     style={styles.textInput}
                                     placeholder="Enter community name"
+                                    placeholderTextColor="#9CA3AF"
                                     value={communityForm.name}
                                     onChangeText={(text) => setCommunityForm(prev => ({ ...prev, name: text }))}
                                 />
@@ -354,6 +401,7 @@ const CommunityListScreen = ({ navigation }) => {
                                 <TextInput
                                     style={[styles.textInput, styles.textArea]}
                                     placeholder="Describe your community"
+                                    placeholderTextColor="#9CA3AF"
                                     value={communityForm.description}
                                     onChangeText={(text) => setCommunityForm(prev => ({ ...prev, description: text }))}
                                     multiline
@@ -361,15 +409,28 @@ const CommunityListScreen = ({ navigation }) => {
                                 />
                             </View>
 
-                            {/* Location Data */}
+                            {/* Location Selection */}
                             <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Location</Text>
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Enter location (e.g., Colombo, Sri Lanka)"
-                                    value={communityForm.locationData}
-                                    onChangeText={(text) => setCommunityForm(prev => ({ ...prev, locationData: text }))}
-                                />
+                                <Text style={styles.label}>Delivery Location *</Text>
+                                <TouchableOpacity
+                                    style={styles.locationButton}
+                                    onPress={() => setShowLocationPicker(true)}
+                                >
+                                    <Text style={styles.locationButtonText}>
+                                        {communityForm.locationData 
+                                            ? `📍 ${communityForm.locationData}` 
+                                            : '🗺️ Select Landmark Location on Map'
+                                        }
+                                    </Text>
+                                </TouchableOpacity>
+                                {communityForm.locationPin && (
+                                    <View style={styles.locationSelectedInfo}>
+                                        <Text style={styles.locationSelectedText}>✓ Location Selected</Text>
+                                        <Text style={styles.locationDetailsText}>
+                                            {communityForm.locationPin.landmark} - {communityForm.locationData.split(' - ')[1]}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
 
                             {/* Privacy Setting */}
@@ -387,7 +448,10 @@ const CommunityListScreen = ({ navigation }) => {
                                             styles.privacyOptionText,
                                             communityForm.isPublic && styles.privacyOptionTextSelected
                                         ]}>
-                                            Public
+                                            🌍 Public
+                                        </Text>
+                                        <Text style={styles.privacyOptionDescription}>
+                                            Anyone can find and join
                                         </Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
@@ -401,7 +465,10 @@ const CommunityListScreen = ({ navigation }) => {
                                             styles.privacyOptionText,
                                             !communityForm.isPublic && styles.privacyOptionTextSelected
                                         ]}>
-                                            Private
+                                            🔒 Private
+                                        </Text>
+                                        <Text style={styles.privacyOptionDescription}>
+                                            Invite only
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -420,20 +487,35 @@ const CommunityListScreen = ({ navigation }) => {
                                     <Text style={styles.cancelButtonText}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[styles.createModalButton, creating && styles.createModalButtonDisabled]}
+                                    style={[styles.createModalButton, creating && styles.createModalButtonDisabled, !communityForm.locationPin && styles.createModalButtonDisabled]}
                                     onPress={handleCreateCommunity}
-                                    disabled={creating}
+                                    disabled={creating || !communityForm.locationPin}
                                 >
                                     {creating ? (
                                         <ActivityIndicator color="#FFFFFF" size="small" />
                                     ) : (
-                                        <Text style={styles.createModalButtonText}>Create</Text>
+                                        <Text style={styles.createModalButtonText}>
+                                            {communityForm.locationPin ? 'Create Community' : 'Select Location First'}
+                                        </Text>
                                     )}
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>
                     </View>
                 </View>
+            </Modal>
+
+            {/* Location Picker Map Modal */}
+            <Modal
+                visible={showLocationPicker}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={() => setShowLocationPicker(false)}
+            >
+                <LocationPickerMap 
+                    onLocationSelect={handleLocationSelect}
+                    onClose={() => setShowLocationPicker(false)}
+                />
             </Modal>
         </View>
     );
@@ -537,18 +619,30 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#EC4899',
         fontWeight: '500',
+        marginBottom: 4,
+    },
+    badgeContainer: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 4,
     },
     privacyBadge: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#8B5CF6',
         fontWeight: '500',
-        marginTop: 4,
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     creatorBadge: {
         fontSize: 11,
         color: '#F59E0B',
         fontWeight: '500',
-        marginTop: 2,
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     actionContainer: {
         borderTopWidth: 1,
@@ -612,6 +706,18 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#9CA3AF',
         textAlign: 'center',
+        marginBottom: 20,
+    },
+    createFirstButton: {
+        backgroundColor: '#EC4899',
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+    },
+    createFirstButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
     },
     modalContainer: {
         flex: 1,
@@ -624,6 +730,11 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 20,
         maxHeight: '80%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
     },
     modalTitle: {
         fontSize: 24,
@@ -633,7 +744,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     formContainer: {
-        maxHeight: 400,
+        maxHeight: 500,
     },
     inputContainer: {
         marginBottom: 16,
@@ -658,6 +769,37 @@ const styles = StyleSheet.create({
         height: 80,
         textAlignVertical: 'top',
     },
+    locationButton: {
+        backgroundColor: '#F3F4F6',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+    },
+    locationButtonText: {
+        color: '#6B7280',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    locationSelectedInfo: {
+        marginTop: 8,
+        padding: 12,
+        backgroundColor: '#F0FDF4',
+        borderRadius: 8,
+        borderLeftWidth: 4,
+        borderLeftColor: '#10B981',
+    },
+    locationSelectedText: {
+        fontSize: 12,
+        color: '#065F46',
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    locationDetailsText: {
+        fontSize: 11,
+        color: '#065F46',
+    },
     privacyOptions: {
         flexDirection: 'row',
         gap: 12,
@@ -667,7 +809,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E5E7EB',
         borderRadius: 12,
-        padding: 12,
+        padding: 16,
         alignItems: 'center',
     },
     privacyOptionSelected: {
@@ -677,10 +819,16 @@ const styles = StyleSheet.create({
     privacyOptionText: {
         color: '#6B7280',
         fontSize: 16,
+        fontWeight: '500',
+        marginBottom: 4,
     },
     privacyOptionTextSelected: {
         color: '#FFFFFF',
-        fontWeight: '500',
+    },
+    privacyOptionDescription: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        textAlign: 'center',
     },
     modalActions: {
         flexDirection: 'row',
@@ -691,8 +839,8 @@ const styles = StyleSheet.create({
         flex: 1,
         borderWidth: 1,
         borderColor: '#E5E7EB',
-        borderRadius: 8,
-        padding: 12,
+        borderRadius: 12,
+        padding: 16,
         alignItems: 'center',
     },
     cancelButtonText: {
@@ -703,13 +851,13 @@ const styles = StyleSheet.create({
     createModalButton: {
         flex: 2,
         backgroundColor: '#EC4899',
-        borderRadius: 8,
-        padding: 12,
+        borderRadius: 12,
+        padding: 16,
         alignItems: 'center',
         justifyContent: 'center',
     },
     createModalButtonDisabled: {
-        opacity: 0.6,
+        backgroundColor: '#9CA3AF',
     },
     createModalButtonText: {
         color: '#FFFFFF',

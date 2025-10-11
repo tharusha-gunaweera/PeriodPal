@@ -1271,7 +1271,7 @@ const styles = StyleSheet.create({
   },
   selectedThumbnail: {
     borderColor: '#FF6B6B',
-  },
+  },  
   thumbnail: {
     width: '100%',
     height: '100%',

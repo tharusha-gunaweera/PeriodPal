@@ -82,7 +82,7 @@ export default function BottomTabNavigator() {
     >
       <Tab.Screen 
         name="Home" 
-        component={Maps} // Using your existing Home component
+        component={Home} // Using your existing Home component
         options={{
           title: 'Home',
           headerTitle: 'Cycle Tracker', // Custom header title for Home
