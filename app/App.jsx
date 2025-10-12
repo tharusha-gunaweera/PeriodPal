@@ -60,7 +60,33 @@ export default function App() {
             <Stack.Screen name="MainApp" component={BottomTabNavigator} />
             
             {/* Stack screens that can be accessed from tabs */}
+            
+          </>
+        ) : (
+          // User is not logged in - show auth flow
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+            
+            {/* Allow access to community list even when not logged in */}
             <Stack.Screen
+              name="CommunityList"
+              component={CommunityListScreen}
+              options={{
+                title: 'Communities',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              }}
+            />
+            <Stack.Screen name="MainApp2" component={BottomTabNavigator} />
+            <Stack.Screen name="Login2" component={LoginScreen} />
+          </>
+        )}
+
+        <Stack.Screen
               name="CommunityList"
               component={CommunityListScreen}
               options={{
@@ -151,30 +177,6 @@ export default function App() {
                 headerTintColor: '#FFFFFF',
               }}
             />
-          </>
-        ) : (
-          // User is not logged in - show auth flow
-          <>
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="SignUp" component={SignUpScreen} />
-            
-            {/* Allow access to community list even when not logged in */}
-            <Stack.Screen
-              name="CommunityList"
-              component={CommunityListScreen}
-              options={{
-                title: 'Communities',
-                headerShown: true,
-                headerStyle: { backgroundColor: '#EC4899' },
-                headerTintColor: '#FFFFFF',
-                headerTitleStyle: { fontWeight: 'bold' },
-              }}
-            />
-            <Stack.Screen name="MainApp2" component={BottomTabNavigator} />
-            <Stack.Screen name="Login2" component={LoginScreen} />
-          </>
-        )}
        
         
       </Stack.Navigator>
