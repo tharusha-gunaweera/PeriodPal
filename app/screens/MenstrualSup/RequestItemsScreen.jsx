@@ -129,8 +129,8 @@ const RequestItemsScreen = ({ navigation }) => {
   const confirmRequest = () => {
     setShowConfirmation(false);
     Alert.alert(
-      'Request Submitted!',
-      `Your request for ${calculateTotalItems()} items has been received${isUrgent ? ' (URGENT)' : ''}. You will receive a confirmation shortly.`,
+      'Request Submitted Successfully! 🎉',
+      `Your request for ${calculateTotalItems()} items has been received${isUrgent ? ' (URGENT)' : ''}.\n\nOur support agent will review your request and contact you within 24 hours to verify details and confirm delivery.\n\nPlease keep your phone nearby and stay tuned!`,
       [{ text: 'OK', onPress: () => navigation.goBack() }]
     );
   };
@@ -179,7 +179,6 @@ const RequestItemsScreen = ({ navigation }) => {
     </View>
   );
 
-
   const CustomCheckbox = ({ value, onValueChange, label }) => (
     <Pressable
       style={({ pressed }) => [
@@ -212,6 +211,19 @@ const RequestItemsScreen = ({ navigation }) => {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Request Sanitary Items</Text>
           <Text style={styles.headerSubtitle}>Get what you need, when you need it</Text>
+        </View>
+
+        {/* Information Banner */}
+        <View style={styles.infoBanner}>
+          <View style={styles.infoIcon}>
+            <Text style={styles.infoIconText}>ℹ️</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoTitle}>How It Works</Text>
+            <Text style={styles.infoText}>
+              After submitting your request, our support agent will contact you within 24 hours to verify details and confirm delivery. Please keep your phone nearby.
+            </Text>
+          </View>
         </View>
 
         {/* Urgent Request Toggle */}
@@ -264,6 +276,12 @@ const RequestItemsScreen = ({ navigation }) => {
               <Text style={styles.sectionIconText}>📍</Text>
             </View>
             <Text style={styles.sectionTitle}>Delivery Details</Text>
+          </View>
+
+          <View style={styles.deliveryNote}>
+            <Text style={styles.deliveryNoteText}>
+              📞 Our agent will contact you on this number to confirm delivery
+            </Text>
           </View>
           
           <View style={styles.deliveryInputContainer}>
@@ -389,7 +407,7 @@ const RequestItemsScreen = ({ navigation }) => {
           <CustomCheckbox
             value={confirmDetails}
             onValueChange={setConfirmDetails}
-            label="I confirm that the details entered above are correct"
+            label="I confirm that the details entered above are correct and understand that an agent will contact me"
           />
         </View>
 
@@ -408,6 +426,9 @@ const RequestItemsScreen = ({ navigation }) => {
           <Text style={styles.submitButtonSubtext}>
             {isUrgent ? 'Urgent - 24hr Delivery' : 'Standard Delivery'}
           </Text>
+          <Text style={styles.submitButtonNote}>
+            Agent will contact you to confirm
+          </Text>
         </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -421,6 +442,13 @@ const RequestItemsScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Confirm Your Request</Text>
+            
+            <View style={styles.modalAgentInfo}>
+              <Text style={styles.modalAgentIcon}>👩‍💼</Text>
+              <Text style={styles.modalAgentText}>
+                Our support agent will review your request and contact you within 24 hours to verify details.
+              </Text>
+            </View>
             
             <ScrollView style={styles.modalItemsList}>
               {Object.entries(selectedItems).map(([itemId, quantity]) => (
@@ -449,7 +477,7 @@ const RequestItemsScreen = ({ navigation }) => {
                 style={styles.modalConfirmButton}
                 onPress={confirmRequest}
               >
-                <Text style={styles.modalConfirmText}>Confirm Request</Text>
+                <Text style={styles.modalConfirmText}>Submit Request</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -482,6 +510,37 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
+  },
+  // New Info Banner Styles
+  infoBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 16,
+    margin: 24,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
+  },
+  infoIcon: {
+    marginRight: 12,
+  },
+  infoIconText: {
+    fontSize: 20,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 18,
   },
   urgentContainer: {
     flexDirection: 'row',
@@ -628,6 +687,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
+  },
+  // New Delivery Note
+  deliveryNote: {
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0EA5E9',
+  },
+  deliveryNoteText: {
+    fontSize: 14,
+    color: '#0369A1',
+    fontWeight: '500',
   },
   deliveryInputContainer: {
     marginBottom: 16,
@@ -782,6 +855,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  // New Submit Button Note
+  submitButtonNote: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 11,
+    fontWeight: '400',
+    marginTop: 2,
+  },
   // Modal Styles
   modalOverlay: {
     flex: 1,
@@ -801,8 +881,28 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: 'center',
+  },
+  // New Modal Agent Info
+  modalAgentInfo: {
+    flexDirection: 'row',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  modalAgentIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  modalAgentText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0369A1',
+    fontWeight: '500',
+    lineHeight: 18,
   },
   modalItemsList: {
     maxHeight: 200,

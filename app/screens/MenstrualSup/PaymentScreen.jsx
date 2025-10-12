@@ -1,20 +1,23 @@
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuth } from 'firebase/auth';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  ActivityIndicator
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { db } from '../../../FirebaseConfig';
 
 const PaymentScreen = ({ route, navigation }) => {
-  // Get order details from navigation parameters
-  const { orderDetails } = route.params || {};
+  const { orderDetails, donationDetails } = route.params || {};
 
   const [cardDetails, setCardDetails] = useState({
     name: '',
@@ -29,33 +32,115 @@ const PaymentScreen = ({ route, navigation }) => {
     postalCode: ''
   });
   const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState(null);
+
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const storedUser = await AsyncStorage.getItem('user');
+      if (storedUser) {
+        setUserData(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const saveDonationToFirestore = async (paymentSuccess = true) => {
+    try {
+      const donationData = {
+        userId: user?.uid || 'anonymous',
+        userEmail: user?.email || userData?.email || 'anonymous',
+        userName: donationDetails?.isAnonymous ? 'Anonymous' : (donationDetails?.name || userData?.firstName + ' ' + userData?.lastName || 'Unknown'),
+        userPhone: userData?.phoneNumber || 'Not provided',
+        amount: donationDetails?.amount || 0,
+        isAnonymous: donationDetails?.isAnonymous || false,
+        message: donationDetails?.message || '',
+        paymentStatus: paymentSuccess ? 'completed' : 'failed',
+        paymentMethod: 'card',
+        createdAt: serverTimestamp(),
+        type: 'donation',
+        billingCity: billingAddress.city,
+        billingState: billingAddress.state,
+        billingPostalCode: billingAddress.postalCode
+      };
+
+      const docRef = await addDoc(collection(db, 'Donations'), donationData);
+      console.log('Donation saved with ID: ', docRef.id);
+      return true;
+    } catch (error) {
+      console.error('Error saving donation to Firestore:', error);
+      return false;
+    }
+  };
+
+  const savePurchaseToFirestore = async (paymentSuccess = true) => {
+    try {
+      const purchaseData = {
+        // User information
+        userId: user?.uid || 'anonymous',
+        userEmail: user?.email || userData?.email || 'anonymous',
+        userName: userData?.firstName + ' ' + userData?.lastName || 'Unknown',
+        userPhone: userData?.phoneNumber || 'Not provided',
+        
+        // Order details
+        items: orderDetails?.items || {},
+        totalAmount: orderDetails?.totalAmount || 0,
+        itemCount: orderDetails?.itemCount || 0,
+        isUrgent: orderDetails?.isUrgent || false,
+        deliveryNote: orderDetails?.deliveryNote || '',
+        
+        // Delivery information
+        deliveryDetails: orderDetails?.deliveryDetails || {},
+        
+        // Payment information
+        paymentStatus: paymentSuccess ? 'completed' : 'failed',
+        paymentMethod: 'card',
+        
+        // System information
+        createdAt: serverTimestamp(),
+        type: 'purchase',
+        
+        // Billing address
+        billingAddress: billingAddress
+      };
+
+      const docRef = await addDoc(collection(db, 'Purchases'), purchaseData);
+      console.log('Purchase saved with ID: ', docRef.id);
+      return true;
+    } catch (error) {
+      console.error('Error saving purchase to Firestore:', error);
+      return false;
+    }
+  };
 
   const handlePayment = async () => {
-    // Validate card details
     if (!cardDetails.name || !cardDetails.number || !cardDetails.expiry || !cardDetails.cvv) {
       Alert.alert('Error', 'Please fill in all card details');
       return;
     }
 
-    // Validate billing address
     if (!billingAddress.address || !billingAddress.city || !billingAddress.state || !billingAddress.postalCode) {
       Alert.alert('Error', 'Please fill in all billing address fields');
       return;
     }
 
-    // Validate card number (exactly 12 digits)
     if (!/^\d{12}$/.test(cardDetails.number.replace(/\s/g, ''))) {
       Alert.alert('Error', 'Card number must be exactly 12 digits');
       return;
     }
 
-    // Validate expiry date format (MM/YY)
     if (!/^\d{2}\/\d{2}$/.test(cardDetails.expiry)) {
       Alert.alert('Error', 'Expiry date must be in MM/YY format');
       return;
     }
 
-    // Validate CVV (3 digits)
     if (!/^\d{3}$/.test(cardDetails.cvv)) {
       Alert.alert('Error', 'CVV must be 3 digits');
       return;
@@ -64,22 +149,47 @@ const PaymentScreen = ({ route, navigation }) => {
     setLoading(true);
 
     try {
-      // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Show success message with order details
+      let saveSuccess;
+      if (donationDetails) {
+        saveSuccess = await saveDonationToFirestore(true);
+      } else {
+        saveSuccess = await savePurchaseToFirestore(true);
+      }
+      
+      if (!saveSuccess) {
+        Alert.alert('Payment Successful', 'Thank you for your payment! There was an issue saving your receipt, but your payment was processed.');
+      }
+      
+      const successMessage = donationDetails 
+        ? `Thank you for your generous donation of LKR ${donationDetails.amount?.toLocaleString()}. Your support helps us provide sanitary items to those in need.`
+        : `Thank you for your order of LKR ${orderDetails?.totalAmount?.toLocaleString()}. Your items will be delivered ${orderDetails?.isUrgent ? 'within 24 hours' : 'soon'}.`;
+
       Alert.alert(
         'Payment Successful!', 
-        `Thank you for your order of LKR ${orderDetails?.totalAmount?.toLocaleString()}. Your items will be delivered ${orderDetails?.isUrgent ? 'within 24 hours' : 'soon'}.`,
+        successMessage,
         [
           { 
             text: 'OK', 
-            onPress: () => navigation.navigate('Shop') // Navigate back to shop
+            onPress: () => {
+              if (donationDetails) {
+                navigation.navigate('MainApp');
+              } else {
+                navigation.navigate('ShopScreen');
+              }
+            }
           }
         ]
       );
       
     } catch (error) {
+      if (donationDetails) {
+        await saveDonationToFirestore(false);
+      } else {
+        await savePurchaseToFirestore(false);
+      }
+      
       Alert.alert('Payment Failed', 'There was an error processing your payment. Please try again.');
       console.error('Payment error:', error);
     } finally {
@@ -88,28 +198,27 @@ const PaymentScreen = ({ route, navigation }) => {
   };
 
   const formatCardNumber = (text) => {
-    // Remove all non-digits
     const cleaned = text.replace(/\D/g, '');
-    // Limit to 12 digits and format with spaces every 4 digits
     const formatted = cleaned.slice(0, 12).replace(/(\d{4})(?=\d)/g, '$1 ');
     return formatted;
   };
 
   const formatExpiry = (text) => {
-    // Remove all non-digits
     const cleaned = text.replace(/\D/g, '');
-    // Format as MM/YY
     if (cleaned.length >= 3) {
       return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
     }
     return cleaned;
   };
 
-  // Calculate item count for display
   const getItemCount = () => {
     if (!orderDetails?.items) return 0;
     return Object.values(orderDetails.items).reduce((sum, item) => sum + item.quantity, 0);
   };
+
+  const isDonation = !!donationDetails;
+  const screenTitle = isDonation ? 'Donation Payment' : 'Online Card Payment';
+  const amount = isDonation ? donationDetails.amount : orderDetails?.totalAmount;
 
   return (
     <KeyboardAvoidingView
@@ -121,64 +230,99 @@ const PaymentScreen = ({ route, navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header with Title */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Online Card Payment</Text>
+          <Text style={styles.headerTitle}>{screenTitle}</Text>
           <Text style={styles.headerSubtitle}>Secure & Encrypted Transaction</Text>
           
-          {/* Order Summary in Header */}
-          {orderDetails && (
+          {(orderDetails || donationDetails) && (
             <View style={styles.orderSummary}>
               <Text style={styles.orderSummaryText}>
-                Order Total: LKR {orderDetails.totalAmount?.toLocaleString()}
+                {isDonation ? 'Donation Amount' : 'Order Total'}: LKR {amount?.toLocaleString()}
               </Text>
-              <Text style={styles.orderItemsText}>
-                {getItemCount()} items • {orderDetails.isUrgent ? '24hr Delivery' : 'Standard Delivery'}
-              </Text>
+              {orderDetails && (
+                <Text style={styles.orderItemsText}>
+                  {getItemCount()} items • {orderDetails.isUrgent ? '24hr Delivery' : 'Standard Delivery'}
+                </Text>
+              )}
+              {donationDetails?.isAnonymous && (
+                <Text style={styles.orderItemsText}>
+                  Anonymous Donation
+                </Text>
+              )}
             </View>
           )}
         </View>
 
-        {/* Payment Form */}
         <View style={styles.formContainer}>
-          {/* Order Details Section */}
-          {orderDetails && (
+          {(orderDetails || donationDetails) && (
             <View style={styles.orderSection}>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionIcon}>
-                  <Text style={styles.sectionIconText}>📦</Text>
+                  <Text style={styles.sectionIconText}>
+                    {isDonation ? '❤️' : '📦'}
+                  </Text>
                 </View>
-                <Text style={styles.sectionTitle}>Order Summary</Text>
+                <Text style={styles.sectionTitle}>
+                  {isDonation ? 'Donation Summary' : 'Order Summary'}
+                </Text>
               </View>
               
               <View style={styles.orderItems}>
-                {Object.entries(orderDetails.items || {}).map(([itemId, item]) => (
-                  <View key={itemId} style={styles.orderItem}>
-                    <Text style={styles.orderItemName}>{item.name}</Text>
-                    <Text style={styles.orderItemDetails}>
-                      {item.quantity} x LKR {item.price.toLocaleString()}
-                    </Text>
-                  </View>
-                ))}
-                
-                {orderDetails.isUrgent && (
-                  <View style={styles.orderItem}>
-                    <Text style={styles.orderItemName}>Urgent Delivery Fee</Text>
-                    <Text style={styles.orderItemDetails}>LKR 200</Text>
-                  </View>
+                {isDonation ? (
+                  <>
+                    <View style={styles.orderItem}>
+                      <Text style={styles.orderItemName}>Donation Amount</Text>
+                      <Text style={styles.orderItemDetails}>
+                        LKR {donationDetails.amount?.toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.orderItem}>
+                      <Text style={styles.orderItemName}>Donor</Text>
+                      <Text style={styles.orderItemDetails}>
+                        {donationDetails.isAnonymous ? 'Anonymous' : donationDetails.name}
+                      </Text>
+                    </View>
+                    {donationDetails.message && (
+                      <View style={styles.orderItem}>
+                        <Text style={styles.orderItemName}>Message</Text>
+                        <Text style={[styles.orderItemDetails, styles.messageText]}>
+                          {donationDetails.message}
+                        </Text>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {Object.entries(orderDetails.items || {}).map(([itemId, item]) => (
+                      <View key={itemId} style={styles.orderItem}>
+                        <Text style={styles.orderItemName}>{item.name}</Text>
+                        <Text style={styles.orderItemDetails}>
+                          {item.quantity} x LKR {item.price.toLocaleString()}
+                        </Text>
+                      </View>
+                    ))}
+                    
+                    {orderDetails.isUrgent && (
+                      <View style={styles.orderItem}>
+                        <Text style={styles.orderItemName}>Urgent Delivery Fee</Text>
+                        <Text style={styles.orderItemDetails}>LKR 200</Text>
+                      </View>
+                    )}
+                  </>
                 )}
                 
                 <View style={styles.orderTotal}>
-                  <Text style={styles.orderTotalLabel}>Total Amount</Text>
+                  <Text style={styles.orderTotalLabel}>
+                    {isDonation ? 'Total Donation' : 'Total Amount'}
+                  </Text>
                   <Text style={styles.orderTotalAmount}>
-                    LKR {orderDetails.totalAmount?.toLocaleString()}
+                    LKR {amount?.toLocaleString()}
                   </Text>
                 </View>
               </View>
             </View>
           )}
 
-          {/* Card Details Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionIcon}>
@@ -187,7 +331,6 @@ const PaymentScreen = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Card Details</Text>
             </View>
             
-            {/* Name on Card */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Name on Card</Text>
               <TextInput
@@ -200,7 +343,6 @@ const PaymentScreen = ({ route, navigation }) => {
               />
             </View>
 
-            {/* Card Number */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Card Number</Text>
               <TextInput
@@ -210,11 +352,10 @@ const PaymentScreen = ({ route, navigation }) => {
                 value={cardDetails.number}
                 onChangeText={(text) => setCardDetails({...cardDetails, number: formatCardNumber(text)})}
                 keyboardType="numeric"
-                maxLength={14} // 12 digits + 2 spaces
+                maxLength={14}
               />
             </View>
 
-            {/* Expiry and CVV Row */}
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfInput]}>
                 <Text style={styles.label}>Expiry Date</Text>
@@ -245,7 +386,6 @@ const PaymentScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          {/* Billing Address Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionIcon}>
@@ -254,7 +394,6 @@ const PaymentScreen = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Billing Address</Text>
             </View>
             
-            {/* Billing Address */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Billing Address</Text>
               <TextInput
@@ -267,7 +406,6 @@ const PaymentScreen = ({ route, navigation }) => {
               />
             </View>
 
-            {/* City */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>City</Text>
               <TextInput
@@ -280,7 +418,6 @@ const PaymentScreen = ({ route, navigation }) => {
               />
             </View>
 
-            {/* State and Postal Code Row */}
             <View style={styles.row}>
               <View style={[styles.inputContainer, styles.halfInput]}>
                 <Text style={styles.label}>State/Province</Text>
@@ -308,7 +445,6 @@ const PaymentScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          {/* Pay Now Button */}
           <TouchableOpacity
             style={[styles.payButton, loading && styles.payButtonDisabled]}
             onPress={handlePayment}
@@ -319,16 +455,17 @@ const PaymentScreen = ({ route, navigation }) => {
             ) : (
               <View style={styles.buttonContent}>
                 <Text style={styles.payButtonText}>
-                  Pay LKR {orderDetails?.totalAmount?.toLocaleString()}
+                  {isDonation ? 'Donate' : 'Pay'} LKR {amount?.toLocaleString()}
                 </Text>
                 <Text style={styles.payButtonSubtext}>Secure & Encrypted Payment</Text>
               </View>
             )}
           </TouchableOpacity>
 
-          {/* Security Badge */}
           <View style={styles.securityBadge}>
-            <Text style={styles.securityText}>🔒 Your payment information is secure and encrypted</Text>
+            <Text style={styles.securityText}>
+              🔒 Your payment information is secure and encrypted. Card details are not stored.
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -450,6 +587,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#EC4899',
+  },
+  messageText: {
+    fontStyle: 'italic',
+    textAlign: 'right',
+    maxWidth: 150,
   },
   orderTotal: {
     flexDirection: 'row',

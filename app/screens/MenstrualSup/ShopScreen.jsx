@@ -208,7 +208,7 @@ const ShopScreen = ({ navigation }) => {
     
     const finalTotal = calculateTotalPrice() + (isUrgent ? 200 : 0);
     
-    navigation.navigate('Payment', {
+    navigation.navigate('PaymentScreen', {
       orderDetails: {
         items: cartItems,
         totalAmount: finalTotal,
@@ -218,6 +218,11 @@ const ShopScreen = ({ navigation }) => {
         itemCount: calculateTotalItems()
       }
     });
+  };
+
+  // Navigate to Request Items screen
+  const navigateToRequestItems = () => {
+    navigation.navigate('RequestItemScreen');
   };
 
   // Focus management functions
@@ -277,7 +282,6 @@ const ShopScreen = ({ navigation }) => {
     </View>
   );
 
-
   const CustomCheckbox = ({ value, onValueChange, label }) => (
     <Pressable
       style={({ pressed }) => [
@@ -320,6 +324,23 @@ const ShopScreen = ({ navigation }) => {
                 </View>
               )}
             </View>
+
+            {/* Community Support Button */}
+            <TouchableOpacity
+              style={styles.supportButton}
+              onPress={navigateToRequestItems}
+            >
+              <View style={styles.supportButtonContent}>
+                <Text style={styles.supportButtonEmoji}>❤️</Text>
+                <View style={styles.supportButtonTextContainer}>
+                  <Text style={styles.supportButtonTitle}>Need Financial Assistance?</Text>
+                  <Text style={styles.supportButtonSubtitle}>
+                    Request free sanitary items through our community support program
+                  </Text>
+                </View>
+                <Text style={styles.supportButtonArrow}>→</Text>
+              </View>
+            </TouchableOpacity>
 
             {/* Urgent Delivery Toggle */}
             <View style={styles.urgentContainer}>
@@ -584,6 +605,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  // New Support Button Styles
+  supportButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    margin: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  supportButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  supportButtonEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  supportButtonTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  supportButtonTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#10B981',
+    marginBottom: 4,
+  },
+  supportButtonSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
+  supportButtonArrow: {
+    fontSize: 18,
+    color: '#10B981',
+    fontWeight: 'bold',
   },
   urgentContainer: {
     flexDirection: 'row',

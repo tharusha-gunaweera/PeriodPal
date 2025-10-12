@@ -9,7 +9,11 @@ import LoginScreen from './screens/auth/SignIn/SignIn';
 import SignUpScreen from './screens/auth/Signup/SignUp';
 import CommunityChatScreen from './screens/Community/CommunityChatScreen';
 import CommunityListScreen from './screens/Community/CommunityListScreen';
-import CommunityLocationView from './screens/Community/CommunityLocationView'; // Add this import
+import CommunityLocationView from './screens/Community/CommunityLocationView';
+import DonationScreen from './screens/Community/DonationsScreen';
+import PaymentScreen from './screens/MenstrualSup/PaymentScreen';
+import RequestItemScreen from './screens/MenstrualSup/RequestItemsScreen';
+import ShopScreen from './screens/MenstrualSup/ShopScreen';
 import BottomTabNavigator from './screens/navigation/BottomTabNavigator';
 import OnboardingScreen from './screens/OnboardingScreen';
 import SplashScreen from './screens/SplashScreen';
@@ -55,7 +59,7 @@ export default function App() {
           <>
             <Stack.Screen name="MainApp" component={BottomTabNavigator} />
             
-            {/* Community screens that can be accessed from anywhere in the app */}
+            {/* Stack screens that can be accessed from tabs */}
             <Stack.Screen
               name="CommunityList"
               component={CommunityListScreen}
@@ -67,17 +71,36 @@ export default function App() {
                 headerTitleStyle: { fontWeight: 'bold' },
               }}
             />
+            
+            <Stack.Screen
+              name="DonationScreen"
+              component={DonationScreen}
+              options={{
+                title: 'Make a Donation',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              }}
+            />
+            
             <Stack.Screen 
               name="HealthTips" 
               component={HealthTipsScreen}
-              options={{ title: 'Health Tips' }}
+              options={{ 
+                title: 'Health Tips',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              }}
             />
             
             <Stack.Screen
               name="CommunityChat"
               component={CommunityChatScreen}
               options={({ route }) => ({
-                title: route.params?.communityName || 'Chat',
+                title: route.params?.communityName || 'Community Chat',
                 headerShown: true,
                 headerStyle: { backgroundColor: '#EC4899' },
                 headerTintColor: '#FFFFFF',
@@ -85,7 +108,6 @@ export default function App() {
               })}
             />
             
-            {/* Add CommunityLocationView screen */}
             <Stack.Screen
               name="CommunityLocationView"
               component={CommunityLocationView}
@@ -97,6 +119,38 @@ export default function App() {
                 headerTitleStyle: { fontWeight: 'bold' },
               })}
             />
+            <Stack.Screen
+              name="PaymentScreen"
+              component={PaymentScreen}
+              options={{
+                title: 'Make a Donation',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              }}
+            />
+            <Stack.Screen
+              name="RequestItemScreen"
+              component={RequestItemScreen}
+              options={{
+                title: 'Make a Donation',
+                headerShown: true,
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+                headerTitleStyle: { fontWeight: 'bold' },
+              }}
+            />
+      
+            <Stack.Screen 
+              name="ShopScreen" 
+              component={ShopScreen}
+              options={{ 
+                title: 'Products',
+                headerStyle: { backgroundColor: '#EC4899' },
+                headerTintColor: '#FFFFFF',
+              }}
+            />
           </>
         ) : (
           // User is not logged in - show auth flow
@@ -105,7 +159,7 @@ export default function App() {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="SignUp" component={SignUpScreen} />
             
-            
+            {/* Allow access to community list even when not logged in */}
             <Stack.Screen
               name="CommunityList"
               component={CommunityListScreen}
@@ -117,9 +171,12 @@ export default function App() {
                 headerTitleStyle: { fontWeight: 'bold' },
               }}
             />
-            <Stack.Screen name="MainApp" component={BottomTabNavigator} />
+            
+            
           </>
         )}
+        <Stack.Screen name="Login" component={LoginScreen} />
+        
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -5,20 +5,23 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // Import your actual screens - UPDATE THESE IMPORTS
-import CommunityListScreen from '../Community/CommunityListScreen';
+import CommunityMemberScreen from '../Community/CommunityMemberScreen';
 import Home from '../Tracker/Home';
-import Maps from '../Maps'
+import ShopScreen from '../MenstrualSup/ShopScreen'; // Import your Products/Shop screen
+import ProfileScreen from '../auth/Profile/ProfileScreen'; // Import your Profile/Account screen
 
 const Tab = createBottomTabNavigator();
 const CommunityStack = createNativeStackNavigator();
+const ShopStack = createNativeStackNavigator();
+const ProfileStack = createNativeStackNavigator();
 
 // Community Stack Navigator
 function CommunityStackNavigator() {
   return (
     <CommunityStack.Navigator>
       <CommunityStack.Screen 
-        name="CommunityList" 
-        component={CommunityListScreen}
+        name="CommunityMemberScreen" 
+        component={CommunityMemberScreen}
         options={{ 
           title: 'Communities',
           headerStyle: { backgroundColor: '#EC4899' },
@@ -29,7 +32,41 @@ function CommunityStackNavigator() {
   );
 }
 
-// Custom Middle Button Component
+// Shop Stack Navigator
+function ShopStackNavigator() {
+  return (
+    <ShopStack.Navigator>
+      <ShopStack.Screen 
+        name="ShopScreen" 
+        component={ShopScreen}
+        options={{ 
+          title: 'Products',
+          headerStyle: { backgroundColor: '#EC4899' },
+          headerTintColor: '#FFFFFF',
+        }}
+      />
+    </ShopStack.Navigator>
+  );
+}
+
+// Profile Stack Navigator
+function ProfileStackNavigator() {
+  return (
+    <ProfileStack.Navigator>
+      <ProfileStack.Screen 
+        name="ProfileScreen" 
+        component={ProfileScreen}
+        options={{ 
+          title: 'My Account',
+          headerStyle: { backgroundColor: '#EC4899' },
+          headerTintColor: '#FFFFFF',
+        }}
+      />
+    </ProfileStack.Navigator>
+  );
+}
+
+// Custom Middle Button Component (if you still want it)
 const CustomMiddleButton = ({ children, onPress }) => (
   <TouchableOpacity
     style={styles.middleButton}
@@ -52,9 +89,9 @@ export default function BottomTabNavigator() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Communities') {
             iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Tips') {
-            iconName = focused ? 'book' : 'book-outline';
-          } else if (route.name === 'Profile') {
+          } else if (route.name === 'Products') {
+            iconName = focused ? 'cart' : 'cart-outline';
+          } else if (route.name === 'Account') {
             iconName = focused ? 'person' : 'person-outline';
           }
 
@@ -82,10 +119,10 @@ export default function BottomTabNavigator() {
     >
       <Tab.Screen 
         name="Home" 
-        component={Home} // Using your existing Home component
+        component={Home}
         options={{
           title: 'Home',
-          headerTitle: 'Cycle Tracker', // Custom header title for Home
+          headerTitle: 'Cycle Tracker',
         }}
       />
       
@@ -98,9 +135,23 @@ export default function BottomTabNavigator() {
         }}
       />
       
+      <Tab.Screen 
+        name="Products" 
+        component={ShopStackNavigator}
+        options={{
+          headerShown: false,
+          title: 'Products',
+        }}
+      />
       
-      
-    
+      <Tab.Screen 
+        name="Account" 
+        component={ProfileStackNavigator}
+        options={{
+          headerShown: false,
+          title: 'Account',
+        }}
+      />
     </Tab.Navigator>
   );
 }

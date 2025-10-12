@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  Switch
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const DonationsScreen = ({ navigation }) => {
@@ -40,7 +40,7 @@ const DonationsScreen = ({ navigation }) => {
     }
 
     // Navigate to PaymentScreen with donation details
-    navigation.navigate('Payment', {
+    navigation.navigate('PaymentScreen', {
       donationDetails: {
         ...donationDetails,
         amount: amount,
