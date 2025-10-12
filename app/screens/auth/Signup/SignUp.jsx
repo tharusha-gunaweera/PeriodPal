@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from "firebase/auth";
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,32 +20,166 @@ const SignUpScreen = ({ navigation }) => {
     firstName: '',
     lastName: '',
     email: '',
-    birthDate: '',
+    phoneNumber: '',
     password: '',
     confirmPassword: ''
   });
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const handleInputChange = (key, value) => {
     setFormData({ ...formData, [key]: value });
+    // Clear error when user starts typing
+    if (errors[key]) {
+      setErrors({ ...errors, [key]: '' });
+    }
+  };
+
+  // Validation functions
+  const validateFirstName = (firstName) => {
+    if (!firstName.trim()) return 'First name is required';
+    if (!/^[A-Za-z]/.test(firstName)) return 'First name must start with a letter';
+    if (!/^[A-Za-z\s]+$/.test(firstName)) return 'First name can only contain letters and spaces';
+    if (firstName.length < 2) return 'First name must be at least 2 characters';
+    return '';
+  };
+
+  const validateLastName = (lastName) => {
+    if (!lastName.trim()) return 'Last name is required';
+    if (!/^[A-Za-z]/.test(lastName)) return 'Last name must start with a letter';
+    if (!/^[A-Za-z\s]+$/.test(lastName)) return 'Last name can only contain letters and spaces';
+    if (lastName.length < 2) return 'Last name must be at least 2 characters';
+    return '';
+  };
+
+  const validateEmail = (email) => {
+    if (!email.trim()) return 'Email is required';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return 'Please enter a valid email address';
+    return '';
+  };
+
+  const validatePhoneNumber = (phoneNumber) => {
+    if (!phoneNumber.trim()) return 'Phone number is required';
+    const phoneRegex = /^[0-9+\-\s()]+$/;
+    if (!phoneRegex.test(phoneNumber)) return 'Phone number can only contain numbers and + - ( )';
+    if (phoneNumber.replace(/[^0-9]/g, '').length < 10) return 'Phone number must be at least 10 digits';
+    return '';
+  };
+
+  const validatePassword = (password) => {
+    if (!password) return 'Password is required';
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (!/(?=.*[a-z])/.test(password)) return 'Password must contain at least one lowercase letter';
+    if (!/(?=.*[A-Z])/.test(password)) return 'Password must contain at least one uppercase letter';
+    if (!/(?=.*\d)/.test(password)) return 'Password must contain at least one number';
+    if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(password)) {
+      return 'Password must contain at least one special character';
+    }
+    return '';
+  };
+
+  const validateForm = () => {
+    const newErrors = {
+      firstName: validateFirstName(formData.firstName),
+      lastName: validateLastName(formData.lastName),
+      email: validateEmail(formData.email),
+      phoneNumber: validatePhoneNumber(formData.phoneNumber),
+      password: validatePassword(formData.password),
+      confirmPassword: formData.password !== formData.confirmPassword ? 'Passwords do not match' : ''
+    };
+
+    setErrors(newErrors);
+    return !Object.values(newErrors).some(error => error !== '');
+  };
+
+  // Check if email already exists
+  const checkEmailExists = async (email) => {
+    try {
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      return methods.length > 0;
+    } catch (error) {
+      console.error('Error checking email:', error);
+      return false;
+    }
   };
 
   const handleSignUp = async () => {
-    const { email, password, confirmPassword } = formData;
-    if (!email || !password) return Alert.alert('Error', 'Please fill all required fields.');
-    if (password !== confirmPassword) return Alert.alert('Error', 'Passwords do not match.');
+    if (!validateForm()) {
+      Alert.alert('Validation Error', 'Please fix the errors in the form');
+      return;
+    }
 
+    // Check if email already exists
     setLoading(true);
     try {
+      const emailExists = await checkEmailExists(formData.email);
+      if (emailExists) {
+        Alert.alert('Email Exists', 'This email is already registered. Please use a different email or login.');
+        setLoading(false);
+        return;
+      }
+
+      const { email, password } = formData;
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await AsyncStorage.setItem('user', JSON.stringify(userCredential.user)); // store user
+      
+      // Store additional user data in AsyncStorage
+      const userData = {
+        ...userCredential.user,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phoneNumber
+      };
+      
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
       Alert.alert('Success', 'Account created successfully!');
       navigation.replace('MainApp');
     } catch (error) {
-      Alert.alert('Sign Up Failed', error.message);
+      console.error('Sign up error:', error);
+      let errorMessage = 'Sign up failed. Please try again.';
+      
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'This email is already registered. Please use a different email.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password is too weak. Please choose a stronger password.';
+          break;
+        default:
+          errorMessage = error.message;
+      }
+      
+      Alert.alert('Sign Up Failed', errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Format phone number as user types
+  const formatPhoneNumber = (text) => {
+    // Remove all non-digit characters
+    const cleaned = text.replace(/\D/g, '');
+    
+    // Format based on length
+    let formatted = cleaned;
+    if (cleaned.length > 3 && cleaned.length <= 6) {
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    } else if (cleaned.length > 6) {
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    }
+    
+    return formatted;
+  };
+
+  const handlePhoneChange = (text) => {
+    const formatted = formatPhoneNumber(text);
+    handleInputChange('phoneNumber', formatted);
   };
 
   return (
@@ -77,23 +211,27 @@ const SignUpScreen = ({ navigation }) => {
               <View style={[styles.inputContainer, styles.halfInput]}>
                 <Text style={styles.label}>First Name *</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, errors.firstName && styles.inputError]}
                   placeholder="First name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.firstName}
                   onChangeText={(v) => handleInputChange('firstName', v)}
+                  autoCapitalize="words"
                 />
+                {errors.firstName ? <Text style={styles.errorText}>{errors.firstName}</Text> : null}
               </View>
 
               <View style={[styles.inputContainer, styles.halfInput]}>
                 <Text style={styles.label}>Last Name *</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, errors.lastName && styles.inputError]}
                   placeholder="Last name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.lastName}
                   onChangeText={(v) => handleInputChange('lastName', v)}
+                  autoCapitalize="words"
                 />
+                {errors.lastName ? <Text style={styles.errorText}>{errors.lastName}</Text> : null}
               </View>
             </View>
 
@@ -101,55 +239,69 @@ const SignUpScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Email *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, errors.email && styles.inputError]}
                 placeholder="Enter your email"
                 placeholderTextColor="#9CA3AF"
                 value={formData.email}
                 onChangeText={(v) => handleInputChange('email', v)}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
               />
+              {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
             </View>
 
-            {/* Birth Date */}
+            {/* Phone Number */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Birth Date</Text>
+              <Text style={styles.label}>Phone Number *</Text>
               <TextInput
-                style={styles.textInput}
-                placeholder="YYYY-MM-DD (Optional)"
+                style={[styles.textInput, errors.phoneNumber && styles.inputError]}
+                placeholder="(123) 456-7890"
                 placeholderTextColor="#9CA3AF"
-                value={formData.birthDate}
-                onChangeText={(v) => handleInputChange('birthDate', v)}
+                value={formData.phoneNumber}
+                onChangeText={handlePhoneChange}
+                keyboardType="phone-pad"
+                maxLength={14}
               />
+              {errors.phoneNumber ? <Text style={styles.errorText}>{errors.phoneNumber}</Text> : null}
             </View>
 
             {/* Password */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, errors.password && styles.inputError]}
                 placeholder="Create a password"
                 placeholderTextColor="#9CA3AF"
                 value={formData.password}
                 onChangeText={(v) => handleInputChange('password', v)}
                 secureTextEntry
                 autoCapitalize="none"
+                autoComplete="new-password"
               />
-              <Text style={styles.passwordHint}>Must be at least 6 characters</Text>
+              {errors.password ? (
+                <Text style={styles.errorText}>{errors.password}</Text>
+              ) : (
+                <Text style={styles.passwordHint}>
+                  Must include: 6+ chars, uppercase, lowercase, number, special character
+                </Text>
+              )}
             </View>
 
             {/* Confirm Password */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Confirm Password *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, errors.confirmPassword && styles.inputError]}
                 placeholder="Confirm password"
                 placeholderTextColor="#9CA3AF"
                 value={formData.confirmPassword}
                 onChangeText={(v) => handleInputChange('confirmPassword', v)}
                 secureTextEntry
                 autoCapitalize="none"
+                autoComplete="new-password"
               />
+              {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
             </View>
 
             {/* Terms */}
@@ -236,6 +388,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#1F2937',
+  },
+  inputError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
   passwordHint: { color: '#6B7280', fontSize: 12, marginTop: 4, marginLeft: 4 },
   termsContainer: { marginBottom: 20, marginTop: 8 },

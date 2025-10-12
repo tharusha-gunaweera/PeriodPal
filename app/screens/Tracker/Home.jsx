@@ -1,94 +1,93 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  ScrollView,
-  Alert
+  View
 } from 'react-native';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { db } from '../../../FirebaseConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CalendarComponent from '../../Components/CalendarComponent';
 import CycleCircle from '../../Components/CycleCircle';
 import FeelingTracker from '../../Components/FeelingTracker';
-import CalendarComponent from '../../Components/CalendarComponent';
 
-export default function Home() {
+const STORAGE_KEYS = {
+  USER_FEELINGS: 'userFeelings',
+  CYCLE_SETTINGS: 'cycleSettings'
+};
+
+export default function Home({ navigation }) { // 🆕 Added navigation prop
   const [showFeelingTracker, setShowFeelingTracker] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cycleData, setCycleData] = useState(null);
   const [calendarData, setCalendarData] = useState([]);
   const [hasData, setHasData] = useState(false);
 
-  const auth = getAuth();
-  const currentUser = auth.currentUser;
-
   useEffect(() => {
-    if (currentUser) {
-      loadUserData();
-    } else {
-      setLoading(false);
-    }
-  }, [currentUser]);
+    loadUserData();
+  }, []);
 
   const loadUserData = async () => {
     try {
-      console.log('Loading user data for:', currentUser?.uid);
+      console.log('Loading user data from local storage...');
       
-      if (!currentUser) {
-        setUserData(null);
-        setHasData(false);
-        setLoading(false);
-        return;
-      }
-
-      const feelingsRef = collection(db, 'userFeelings');
-      const q = query(feelingsRef, where('userId', '==', currentUser.uid));
+      const storedFeelings = await AsyncStorage.getItem(STORAGE_KEYS.USER_FEELINGS);
+      const feelingsData = storedFeelings ? JSON.parse(storedFeelings) : [];
       
-      const querySnapshot = await getDocs(q);
+      console.log('Loaded feelings data:', feelingsData.length, 'entries');
       
-      console.log('Found documents:', querySnapshot.size);
+      setUserData(feelingsData);
       
-      if (querySnapshot.empty) {
-        console.log('No user data found');
-        setUserData(null);
+      if (feelingsData.length > 0) {
+        processUserData(feelingsData);
+        setHasData(true);
+      } else {
         setHasData(false);
         setCycleData(null);
         setCalendarData([]);
-      } else {
-        const feelingsData = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          feelingsData.push({
-            id: doc.id,
-            ...data
-          });
-        });
-
-        // Sort by timestamp (newest first)
-        feelingsData.sort((a, b) => b.timestamp - a.timestamp);
-        
-        console.log('Processed feelings data:', feelingsData.length);
-        setUserData(feelingsData);
-        
-        // Process for cycle and calendar
-        processUserData(feelingsData);
       }
     } catch (error) {
       console.error('Error loading user data:', error);
-      setUserData(null);
+      setUserData([]);
       setHasData(false);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSaveFeeling = async (feelingData) => {
+    try {
+      const newFeeling = {
+        ...feelingData,
+        id: Date.now().toString(),
+        timestamp: Date.now()
+      };
+
+      // Get existing data
+      const storedFeelings = await AsyncStorage.getItem(STORAGE_KEYS.USER_FEELINGS);
+      const feelingsData = storedFeelings ? JSON.parse(storedFeelings) : [];
+      
+      // Add new feeling
+      const updatedFeelings = [newFeeling, ...feelingsData];
+      
+      // Save back to storage
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_FEELINGS, JSON.stringify(updatedFeelings));
+      
+      Alert.alert('Success', 'Your feelings have been saved!');
+      loadUserData(); // Reload to update display
+    } catch (error) {
+      console.error('Error saving feeling:', error);
+      Alert.alert('Error', 'Failed to save your feelings');
+    }
+  };
+
+  // 🎯 ACCURATE: Process user data with real cycle calculations
   const processUserData = (feelingsData) => {
     console.log('Processing user data for cycle prediction...');
     
-    // Always create calendar data if we have any feelings
+    // Create calendar data
     if (feelingsData.length > 0) {
       const calendarEntries = feelingsData.map(feeling => ({
         date: new Date(feeling.timestamp).toISOString().split('T')[0],
@@ -103,78 +102,146 @@ export default function Home() {
       setHasData(true);
     }
 
-    // Try to calculate cycle data
-    const cycleInfo = calculateCycleData(feelingsData);
+    // Calculate accurate cycle data
+    const cycleInfo = calculateAccurateCycleData(feelingsData);
     if (cycleInfo) {
       setCycleData(cycleInfo);
       console.log('Cycle data calculated:', cycleInfo);
     } else {
-      // Set default cycle data for new users with some tracking
+      // Set default cycle data for new users
       setCycleData({
         periodDays: 5,
         fertileDays: 6,
         totalDays: 28,
         currentDay: 1,
         daysUntilNextPeriod: 28,
-        isPrediction: false
+        nextPeriodDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000),
+        fertileStartDay: 10,
+        fertileEndDay: 16,
+        isFertile: false,
+        isPrediction: false,
+        lastPeriodDate: null
       });
       console.log('Using default cycle data');
     }
   };
 
-  const calculateCycleData = (feelingsData) => {
-    // Get all bleeding days (excluding 'none')
-    const bleedingDays = feelingsData
-      .filter(f => f.bleeding && f.bleeding.id !== 'none')
-      .sort((a, b) => a.timestamp - b.timestamp);
+const calculateAccurateCycleData = (feelingsData) => {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  
+  console.log('Today:', today.toLocaleDateString());
 
-    console.log('Bleeding days found:', bleedingDays.length);
+  // Get all period days (bleeding that's not 'none') sorted by date
+  const periodDays = feelingsData
+    .filter(f => f.bleeding && f.bleeding.id !== 'none')
+    .sort((a, b) => a.timestamp - b.timestamp);
 
-    // If we have at least 2 bleeding events, try to predict
-    if (bleedingDays.length >= 2) {
-      const recentPeriods = bleedingDays.slice(-3); // Get last 3 periods
-      
-      let totalCycleLength = 0;
-      let cycleCount = 0;
+  console.log('Period days found:', periodDays.length);
 
-      // Calculate gaps between consecutive periods
-      for (let i = 1; i < recentPeriods.length; i++) {
-        const daysBetween = Math.round(
-          (recentPeriods[i].timestamp - recentPeriods[i-1].timestamp) / (1000 * 60 * 60 * 24)
-        );
-        
-        // Only count reasonable cycle lengths (21-35 days)
-        if (daysBetween >= 21 && daysBetween <= 35) {
-          totalCycleLength += daysBetween;
-          cycleCount++;
-        }
-      }
+  if (periodDays.length === 0) {
+    // No period data available - use default 28-day cycle
+    const nextPeriodDate = new Date(todayStart + 28 * 24 * 60 * 60 * 1000);
+    return {
+      periodDays: 5,
+      fertileDays: 6,
+      totalDays: 28,
+      currentDay: 1,
+      daysUntilNextPeriod: 28,
+      nextPeriodDate: nextPeriodDate,
+      fertileStartDay: 10,
+      fertileEndDay: 16,
+      isFertile: false,
+      isPrediction: false,
+      lastPeriodDate: null
+    };
+  }
 
-      if (cycleCount > 0) {
-        const avgCycleLength = Math.round(totalCycleLength / cycleCount);
-        const lastPeriod = recentPeriods[recentPeriods.length - 1];
-        const today = new Date();
-        const daysSinceLastPeriod = Math.floor(
-          (today.getTime() - lastPeriod.timestamp) / (1000 * 60 * 60 * 24)
-        );
-        
-        const currentDay = (daysSinceLastPeriod % avgCycleLength) + 1;
-        const daysUntilNextPeriod = avgCycleLength - daysSinceLastPeriod;
-
-        return {
-          periodDays: 5, // Could be calculated from history
-          fertileDays: 6,
-          totalDays: avgCycleLength,
-          currentDay: Math.max(1, Math.min(currentDay, avgCycleLength)),
-          daysUntilNextPeriod: Math.max(0, daysUntilNextPeriod),
-          isPrediction: true
-        };
-      }
+  // Calculate average cycle length from historical data
+  let cycleLengths = [];
+  for (let i = 1; i < periodDays.length; i++) {
+    const daysBetween = Math.round(
+      (periodDays[i].timestamp - periodDays[i-1].timestamp) / (1000 * 60 * 60 * 24)
+    );
+    
+    if (daysBetween >= 21 && daysBetween <= 35) {
+      cycleLengths.push(daysBetween);
     }
+  }
 
-    // If not enough data for prediction, return null
-    return null;
+  const avgCycleLength = cycleLengths.length > 0 
+    ? Math.round(cycleLengths.reduce((a, b) => a + b) / cycleLengths.length)
+    : 28;
+
+  const lastPeriod = periodDays[periodDays.length - 1];
+  const lastPeriodDate = new Date(lastPeriod.timestamp);
+  
+  // 🎯 FIXED: Calculate current cycle day based on last period and today
+  const daysSinceLastPeriod = Math.floor(
+    (todayStart - lastPeriodDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  const currentDay = (daysSinceLastPeriod % avgCycleLength) + 1;
+  const daysUntilNextPeriod = avgCycleLength - daysSinceLastPeriod;
+  
+  // 🎯 FIXED: Calculate next period date
+  const nextPeriodDate = new Date(lastPeriodDate);
+  nextPeriodDate.setDate(lastPeriodDate.getDate() + avgCycleLength);
+  
+  // 🎯 FIXED: Calculate previous period date for complete cycle visualization
+  const previousPeriodDate = new Date(lastPeriodDate);
+  previousPeriodDate.setDate(lastPeriodDate.getDate() - avgCycleLength);
+  
+  // 🎯 FIXED: Fertile window (typically days 10-16 of cycle)
+  const fertileStartDay = 10;
+  const fertileEndDay = 16;
+  const isFertile = currentDay >= fertileStartDay && currentDay <= fertileEndDay;
+
+  // Calculate average period length from historical data
+  const periodLengths = [];
+  let currentPeriod = [];
+  
+  for (let i = 0; i < periodDays.length; i++) {
+    if (i === 0 || periodDays[i].timestamp - periodDays[i-1].timestamp <= 2 * 24 * 60 * 60 * 1000) {
+      currentPeriod.push(periodDays[i]);
+    } else {
+      if (currentPeriod.length > 0) {
+        periodLengths.push(currentPeriod.length);
+      }
+      currentPeriod = [periodDays[i]];
+    }
+  }
+  if (currentPeriod.length > 0) {
+    periodLengths.push(currentPeriod.length);
+  }
+  
+  const avgPeriodDays = periodLengths.length > 0 
+    ? Math.round(periodLengths.reduce((a, b) => a + b) / periodLengths.length)
+    : 5;
+
+  console.log('Cycle calculation complete:');
+  console.log('- Current day:', currentDay);
+  console.log('- Total days:', avgCycleLength);
+  console.log('- Period days:', avgPeriodDays);
+  console.log('- Fertile window:', fertileStartDay, '-', fertileEndDay);
+  console.log('- Last period:', lastPeriodDate.toLocaleDateString());
+  console.log('- Next period:', nextPeriodDate.toLocaleDateString());
+
+  return {
+    periodDays: avgPeriodDays,
+    fertileDays: fertileEndDay - fertileStartDay + 1,
+    totalDays: avgCycleLength,
+    currentDay: Math.max(1, Math.min(currentDay, avgCycleLength)),
+    daysUntilNextPeriod: Math.max(0, daysUntilNextPeriod),
+    nextPeriodDate: nextPeriodDate,
+    previousPeriodDate: previousPeriodDate,
+    fertileStartDay: fertileStartDay,
+    fertileEndDay: fertileEndDay,
+    isFertile: isFertile,
+    isPrediction: cycleLengths.length > 0,
+    lastPeriodDate: lastPeriodDate
   };
+};
 
   const getMoodEmoji = (moods) => {
     if (!moods || moods.length === 0) return '😐';
@@ -195,25 +262,20 @@ export default function Home() {
     return moodEmojis[moods[0]] || '😐';
   };
 
-  const handleSaveFeeling = async (feelingData) => {
-    if (!currentUser) {
-      Alert.alert('Error', 'Please log in to save your feelings');
-      return;
-    }
-
+  // Clear all data (for testing)
+  const clearAllData = async () => {
     try {
-      await addDoc(collection(db, 'userFeelings'), {
-        ...feelingData,
-        userId: currentUser.uid,
-        timestamp: Date.now()
-      });
-
-      Alert.alert('Success', 'Your feelings have been saved!');
-      loadUserData(); // Reload to update display
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_FEELINGS);
+      Alert.alert('Success', 'All data cleared');
+      loadUserData();
     } catch (error) {
-      console.error('Error saving feeling:', error);
-      Alert.alert('Error', 'Failed to save your feelings');
+      console.error('Error clearing data:', error);
     }
+  };
+
+  // 🆕 Navigate to Health Tips
+  const navigateToHealthTips = () => {
+    navigation.navigate('HealthTips');
   };
 
   if (loading) {
@@ -247,15 +309,46 @@ export default function Home() {
         </Text>
       </TouchableOpacity>
 
-      {/* Debug Info - Remove in production */}
+      {/* Health Tips Button - UPDATED with navigation */}
+      <TouchableOpacity
+        style={styles.healthTipsButton}
+        onPress={navigateToHealthTips} // 🆕 Updated to use navigation
+      >
+        <Text style={styles.healthTipsButtonEmoji}>💡</Text>
+        <Text style={styles.healthTipsButtonText}>Visit for Health Tips</Text>
+      </TouchableOpacity>
+
+      {/* Debug Info */}
       <View style={styles.debugInfo}>
-        <Text style={styles.debugText}>
-          Data Status: {hasData ? `✅ ${userData?.length} entries` : '❌ No data'}
-          {cycleData && ` | Cycle Day: ${cycleData.currentDay}`}
-        </Text>
+        <View style={styles.debugTextContainer}>
+          <Text style={styles.debugText}>
+            📅 Today: {new Date().toLocaleDateString()}
+          </Text>
+          <Text style={styles.debugText}>
+            📊 Entries: {userData.length}
+          </Text>
+          {cycleData && (
+            <>
+              <Text style={styles.debugText}>
+                🔄 Day: {cycleData.currentDay}/{cycleData.totalDays}
+              </Text>
+              <Text style={styles.debugText}>
+                ⏳ Next Period: {cycleData.daysUntilNextPeriod} days
+              </Text>
+              {cycleData.lastPeriodDate && (
+                <Text style={styles.debugText}>
+                  🩸 Last: {cycleData.lastPeriodDate.toLocaleDateString()}
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+        <TouchableOpacity onPress={clearAllData} style={styles.clearButton}>
+          <Text style={styles.clearButtonText}>Clear Data</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Show content if user has any tracking data */}
+      {/* Show content if user has tracking data */}
       {hasData ? (
         <>
           {/* Cycle Circle - Show if we have cycle data */}
@@ -266,12 +359,29 @@ export default function Home() {
                 fertileDays={cycleData.fertileDays} 
                 totalDays={cycleData.totalDays}
                 currentDay={cycleData.currentDay}
+                fertileStartDay={cycleData.fertileStartDay}
+                fertileEndDay={cycleData.fertileEndDay}
               />
-              {!cycleData.isPrediction && (
-                <Text style={styles.predictionNote}>
-                  🔄 Track more days to get accurate predictions
+              
+              {/* Cycle Status Info */}
+              <View style={styles.cycleStatus}>
+                <Text style={[
+                  styles.statusText,
+                  cycleData.isFertile ? styles.fertileStatus : styles.regularStatus
+                ]}>
+                  {cycleData.isFertile ? '🎯 Fertile Window (Days 10-16)' : '📅 Regular Cycle Days'}
                 </Text>
-              )}
+                {cycleData.nextPeriodDate && (
+                  <Text style={styles.nextPeriodText}>
+                    Next period: {cycleData.nextPeriodDate.toLocaleDateString()}
+                  </Text>
+                )}
+                {!cycleData.isPrediction && (
+                  <Text style={styles.predictionNote}>
+                    🔄 Track more periods for accurate predictions
+                  </Text>
+                )}
+              </View>
             </View>
           )}
 
@@ -294,18 +404,18 @@ export default function Home() {
           )}
 
           {/* Calendar - Show if we have calendar data */}
-          {calendarData.length > 0 && (
+          {calendarData.length > 0 && cycleData && (
             <View style={styles.calendarSection}>
               <Text style={styles.sectionTitle}>Your Cycle Calendar</Text>
-              <CalendarComponent data={calendarData} />
+              <CalendarComponent data={calendarData} cycleData={cycleData} />
             </View>
           )}
 
           {/* Recent Entries */}
           <View style={styles.recentSection}>
             <Text style={styles.sectionTitle}>Recent Tracking</Text>
-            {userData?.slice(0, 5).map((entry, index) => (
-              <View key={index} style={styles.entryItem}>
+            {userData.slice(0, 5).map((entry) => (
+              <View key={entry.id} style={styles.entryItem}>
                 <Text style={styles.entryDate}>
                   {new Date(entry.timestamp).toLocaleDateString()}
                 </Text>
@@ -326,7 +436,7 @@ export default function Home() {
             Track your feelings and symptoms to get personalized cycle predictions and insights.
           </Text>
           <Text style={styles.welcomeTip}>
-            Tap the "How are you feeling today?" button to get started!
+            💡 Tip: Mark your bleeding days to get accurate cycle predictions!
           </Text>
         </View>
       )}
@@ -395,28 +505,96 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#EC4899',
   },
+  // Health Tips Button Styles
+  healthTipsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderLeftWidth: 4,
+    borderLeftColor: '#8B5CF6',
+  },
+  healthTipsButtonEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  healthTipsButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
   debugInfo: {
     backgroundColor: '#E8F4FD',
     margin: 20,
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     borderLeftWidth: 4,
     borderLeftColor: '#4A90E2',
+  },
+  debugTextContainer: {
+    marginBottom: 12,
   },
   debugText: {
     fontSize: 12,
     color: '#2C3E50',
     fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  clearButton: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
   circleContainer: {
     alignItems: 'center',
     marginVertical: 20,
   },
+  cycleStatus: {
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    minWidth: '80%',
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  fertileStatus: {
+    color: '#0EA5E9',
+  },
+  regularStatus: {
+    color: '#6B7280',
+  },
+  nextPeriodText: {
+    fontSize: 14,
+    color: '#EC4899',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
   predictionNote: {
     fontSize: 12,
     color: '#8B5CF6',
-    marginTop: 8,
     fontStyle: 'italic',
+    textAlign: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -502,5 +680,8 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     fontStyle: 'italic',
     textAlign: 'center',
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
   },
 });

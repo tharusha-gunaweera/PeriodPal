@@ -7,12 +7,13 @@ import 'react-native-gesture-handler';
 // Import screens
 import LoginScreen from './screens/auth/SignIn/SignIn';
 import SignUpScreen from './screens/auth/Signup/SignUp';
-import CommunityListScreen from './screens/Community/CommunityListScreen';
 import CommunityChatScreen from './screens/Community/CommunityChatScreen';
+import CommunityListScreen from './screens/Community/CommunityListScreen';
 import CommunityLocationView from './screens/Community/CommunityLocationView'; // Add this import
 import BottomTabNavigator from './screens/navigation/BottomTabNavigator';
 import OnboardingScreen from './screens/OnboardingScreen';
 import SplashScreen from './screens/SplashScreen';
+import HealthTipsScreen from './screens/Tips/HealthTipsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,6 +49,7 @@ export default function App() {
           animation: 'slide_from_right'
         }}
       >
+        
         {isLoggedIn ? (
           // User is logged in - show main app with tabs
           <>
@@ -64,6 +66,11 @@ export default function App() {
                 headerTintColor: '#FFFFFF',
                 headerTitleStyle: { fontWeight: 'bold' },
               }}
+            />
+            <Stack.Screen 
+              name="HealthTips" 
+              component={HealthTipsScreen}
+              options={{ title: 'Health Tips' }}
             />
             
             <Stack.Screen
@@ -98,7 +105,7 @@ export default function App() {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="SignUp" component={SignUpScreen} />
             
-            {/* Allow access to communities even when not logged in (read-only) */}
+            
             <Stack.Screen
               name="CommunityList"
               component={CommunityListScreen}
@@ -110,6 +117,7 @@ export default function App() {
                 headerTitleStyle: { fontWeight: 'bold' },
               }}
             />
+            <Stack.Screen name="MainApp" component={BottomTabNavigator} />
           </>
         )}
       </Stack.Navigator>

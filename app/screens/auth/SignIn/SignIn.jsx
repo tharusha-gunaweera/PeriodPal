@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +13,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../../../../FirebaseConfig';
 
 const LoginScreen = ({ navigation }) => {
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loginButton: {
-    backgroundColor: '#E91E63', // main pink
+    backgroundColor: '#E91E63', 
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

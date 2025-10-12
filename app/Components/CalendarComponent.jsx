@@ -2,102 +2,196 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 
-const CalendarComponent = ({ data }) => {
+const CalendarComponent = ({ data, cycleData }) => {
   console.log('Calendar data received:', data?.length, 'entries');
+  console.log('Cycle data for calendar:', cycleData);
 
-  // Convert our data to the format react-native-calendars expects
+  const getPeriodAndFertileDays = () => {
+    if (!cycleData || !cycleData.lastPeriodDate) {
+      console.log('No cycle data available for predictions');
+      return { periodDays: [], fertileDays: [] };
+    }
+
+    const { lastPeriodDate, totalDays, periodDays, fertileStartDay, fertileEndDay } = cycleData;
+    
+    const periodDates = [];
+    const fertileDates = [];
+
+    console.log('Last period date:', lastPeriodDate.toLocaleDateString());
+    console.log('Total cycle days:', totalDays);
+    console.log('Period days:', periodDays);
+    console.log('Fertile window:', fertileStartDay, '-', fertileEndDay);
+
+    for (let i = 0; i < periodDays; i++) {
+      const periodDate = new Date(lastPeriodDate);
+      periodDate.setDate(lastPeriodDate.getDate() + i);
+      const dateString = periodDate.toISOString().split('T')[0];
+      periodDates.push(dateString);
+    }
+    console.log('Period dates:', periodDates);
+
+    for (let i = fertileStartDay - 1; i < fertileEndDay; i++) {
+      const fertileDate = new Date(lastPeriodDate);
+      fertileDate.setDate(lastPeriodDate.getDate() + i);
+      const dateString = fertileDate.toISOString().split('T')[0];
+      fertileDates.push(dateString);
+    }
+    console.log('Fertile dates:', fertileDates);
+
+    return {
+      periodDays: periodDates,
+      fertileDays: fertileDates
+    };
+  };
+
   const getMarkedDates = () => {
     const markedDates = {};
+    const { periodDays, fertileDays } = getPeriodAndFertileDays();
+
+    console.log('Marking period days:', periodDays.length);
+    console.log('Marking fertile days:', fertileDays.length);
+
+    periodDays.forEach(date => {
+      markedDates[date] = {
+        customStyles: {
+          container: {
+            backgroundColor: '#FDF2F8',
+            borderRadius: 8,
+            borderWidth: 2,
+            borderColor: '#EC4899',
+          },
+          text: {
+            color: '#EC4899',
+            fontWeight: 'bold',
+          }
+        }
+      };
+    });
+
+    fertileDays.forEach(date => {
+      if (!markedDates[date]) {
+        markedDates[date] = {
+          customStyles: {
+            container: {
+              backgroundColor: '#F0F9FF',
+              borderRadius: 8,
+              borderWidth: 2,
+              borderColor: '#0EA5E9',
+            },
+            text: {
+              color: '#0EA5E9',
+              fontWeight: 'bold',
+            }
+          }
+        };
+      }
+    });
 
     if (data && data.length > 0) {
       data.forEach(entry => {
         if (entry.date) {
-          let dotColor = '#E5E7EB'; // Default gray for no bleeding
-          let selectedColor = '#F3F4F6'; // Default selection color
+          let dotColor = '#E5E7EB';
           
-          // Set color based on bleeding level
           if (entry.bleeding) {
             switch (entry.bleeding.id) {
               case 'light':
                 dotColor = '#FFB6C1';
-                selectedColor = '#FFF0F3';
                 break;
               case 'medium':
                 dotColor = '#FF69B4';
-                selectedColor = '#FFE4EC';
                 break;
               case 'heavy':
                 dotColor = '#DC143C';
-                selectedColor = '#FFE4E6';
                 break;
               case 'spotting':
                 dotColor = '#FFE4E1';
-                selectedColor = '#FFF0EE';
                 break;
               default:
                 dotColor = '#E5E7EB';
             }
           }
 
-          // Get mood emoji
-          const moodEmoji = entry.moodEmoji || '😐';
-
-          markedDates[entry.date] = {
-            selected: true,
-            selectedColor: selectedColor,
-            selectedTextColor: '#1F2937',
-            customStyles: {
-              container: {
-                borderRadius: 8,
+          if (markedDates[entry.date]) {
+            markedDates[entry.date] = {
+              ...markedDates[entry.date],
+              dots: [
+                {
+                  key: 'bleeding',
+                  color: dotColor,
+                  selectedDotColor: dotColor,
+                },
+                ...(entry.moods && entry.moods.length > 0 ? [{
+                  key: 'mood',
+                  color: '#8B5CF6',
+                  selectedDotColor: '#8B5CF6',
+                }] : [])
+              ]
+            };
+          } else {
+            markedDates[entry.date] = {
+              selected: true,
+              selectedColor: '#F3F4F6',
+              selectedTextColor: '#1F2937',
+              customStyles: {
+                container: {
+                  borderRadius: 8,
+                },
+                text: {
+                  fontWeight: '600',
+                }
               },
-              text: {
-                fontWeight: '600',
-              }
-            },
-            dots: [
-              {
-                key: 'bleeding',
-                color: dotColor,
-                selectedDotColor: dotColor,
-              },
-              {
-                key: 'mood',
-                color: '#8B5CF6', // Purple for mood
-                selectedDotColor: '#8B5CF6',
-              }
-            ],
-            // Store additional data for custom rendering if needed
-            bleeding: entry.bleeding,
-            mood: moodEmoji
-          };
+              dots: [
+                {
+                  key: 'bleeding',
+                  color: dotColor,
+                  selectedDotColor: dotColor,
+                },
+                ...(entry.moods && entry.moods.length > 0 ? [{
+                  key: 'mood',
+                  color: '#8B5CF6',
+                  selectedDotColor: '#8B5CF6',
+                }] : [])
+              ]
+            };
+          }
         }
       });
     }
 
-    // Mark today
     const today = new Date().toISOString().split('T')[0];
-    markedDates[today] = {
-      ...markedDates[today],
-      selected: true,
-      selectedColor: '#FDF2F8',
-      selectedTextColor: '#EC4899',
-      customStyles: {
-        container: {
-          borderRadius: 8,
-          borderWidth: 2,
-          borderColor: '#EC4899',
-        },
-        text: {
-          color: '#EC4899',
-          fontWeight: 'bold',
+    if (markedDates[today]) {
+      markedDates[today] = {
+        ...markedDates[today],
+        customStyles: {
+          ...markedDates[today].customStyles,
+          container: {
+            ...markedDates[today].customStyles.container,
+            borderWidth: 3,
+            borderColor: '#10B981',
+          }
         }
-      }
-    };
+      };
+    } else {
+      markedDates[today] = {
+        customStyles: {
+          container: {
+            borderRadius: 8,
+            borderWidth: 3,
+            borderColor: '#10B981',
+            backgroundColor: '#F0FDF4',
+          },
+          text: {
+            color: '#10B981',
+            fontWeight: 'bold',
+          }
+        }
+      };
+    }
 
+    console.log('Total marked dates:', Object.keys(markedDates).length);
     return markedDates;
   };
 
-  // Configure locale (optional)
   LocaleConfig.locales['en'] = {
     monthNames: [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -120,13 +214,15 @@ const CalendarComponent = ({ data }) => {
       <View style={styles.container}>
         <Text style={styles.title}>Cycle Calendar</Text>
         <View style={styles.placeholder}>
-          <Text>📅</Text>
+          <Text style={styles.placeholderEmoji}>📅</Text>
           <Text style={styles.placeholderText}>No tracking data yet</Text>
           <Text style={styles.placeholderSubtext}>Start tracking your feelings to see your cycle history</Text>
         </View>
       </View>
     );
   }
+
+  const markedDates = getMarkedDates();
 
   return (
     <View style={styles.container}>
@@ -140,7 +236,7 @@ const CalendarComponent = ({ data }) => {
           textSectionTitleColor: '#6B7280',
           selectedDayBackgroundColor: '#EC4899',
           selectedDayTextColor: '#ffffff',
-          todayTextColor: '#EC4899',
+          todayTextColor: '#10B981',
           dayTextColor: '#1F2937',
           textDisabledColor: '#D1D5DB',
           dotColor: '#EC4899',
@@ -155,8 +251,8 @@ const CalendarComponent = ({ data }) => {
           textMonthFontSize: 16,
           textDayHeaderFontSize: 12,
         }}
-        markingType={'multi-dot'}
-        markedDates={getMarkedDates()}
+        markingType={'custom'}
+        markedDates={markedDates}
         hideExtraDays={true}
         showWeekNumbers={false}
         onDayPress={(day) => {
@@ -164,40 +260,89 @@ const CalendarComponent = ({ data }) => {
         }}
       />
 
-      {/* Legend */}
       <View style={styles.legend}>
-        <Text style={styles.legendTitle}>Bleeding Levels:</Text>
-        <View style={styles.legendItems}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#FFB6C1' }]} />
-            <Text style={styles.legendText}>Light</Text>
+        <Text style={styles.legendTitle}>Calendar Legend:</Text>
+        
+        <View style={styles.legendSection}>
+          <Text style={styles.legendSubtitle}>Cycle Phases:</Text>
+          <View style={styles.legendItems}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#FDF2F8', borderColor: '#EC4899', borderWidth: 2 }]} />
+              <Text style={styles.legendText}>Period Days</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#F0F9FF', borderColor: '#0EA5E9', borderWidth: 2 }]} />
+              <Text style={styles.legendText}>Fertile Window</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#F0FDF4', borderColor: '#10B981', borderWidth: 3 }]} />
+              <Text style={styles.legendText}>Today</Text>
+            </View>
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#FF69B4' }]} />
-            <Text style={styles.legendText}>Medium</Text>
+        </View>
+
+        <View style={styles.legendSection}>
+          <Text style={styles.legendSubtitle}>Bleeding Levels:</Text>
+          <View style={styles.legendItems}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#FFB6C1' }]} />
+              <Text style={styles.legendText}>Light</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#FF69B4' }]} />
+              <Text style={styles.legendText}>Medium</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#DC143C' }]} />
+              <Text style={styles.legendText}>Heavy</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#FFE4E1' }]} />
+              <Text style={styles.legendText}>Spotting</Text>
+            </View>
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#DC143C' }]} />
-            <Text style={styles.legendText}>Heavy</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#FFE4E1' }]} />
-            <Text style={styles.legendText}>Spotting</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#8B5CF6' }]} />
-            <Text style={styles.legendText}>Mood</Text>
+        </View>
+
+        <View style={styles.legendSection}>
+          <Text style={styles.legendSubtitle}>Other:</Text>
+          <View style={styles.legendItems}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: '#8B5CF6' }]} />
+              <Text style={styles.legendText}>Mood</Text>
+            </View>
           </View>
         </View>
       </View>
 
-      {/* Data Summary */}
+      {cycleData && (
+        <View style={styles.cycleSummary}>
+          <Text style={styles.summaryTitle}>Current Cycle Info:</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryText}>Day {cycleData.currentDay} of {cycleData.totalDays}</Text>
+            <Text style={styles.summaryText}>
+              {cycleData.currentDay <= cycleData.periodDays ? '🩸 Period' : 
+               cycleData.isFertile ? '🎯 Fertile' : '📅 Regular'}
+            </Text>
+          </View>
+          {cycleData.lastPeriodDate && (
+            <Text style={styles.summaryText}>
+              Last period: {cycleData.lastPeriodDate.toLocaleDateString()}
+            </Text>
+          )}
+          {cycleData.nextPeriodDate && (
+            <Text style={styles.summaryText}>
+              Next period: ~{cycleData.nextPeriodDate.toLocaleDateString()} 
+              ({cycleData.daysUntilNextPeriod} days)
+            </Text>
+          )}
+        </View>
+      )}
+
       <View style={styles.summary}>
         <Text style={styles.summaryText}>
-          📊 You have {data.length} tracking entr{data.length === 1 ? 'y' : 'ies'} 
-          {data.filter(d => d.bleeding && d.bleeding.id !== 'none').length > 0 && 
-            ` (${data.filter(d => d.bleeding && d.bleeding.id !== 'none').length} with bleeding)`
-          }
+          📊 {data.length} tracking entr{data.length === 1 ? 'y' : 'ies'} • 
+          🩸 {data.filter(d => d.bleeding && d.bleeding.id !== 'none').length} bleeding days • 
+          😊 {data.filter(d => d.moods && d.moods.length > 0).length} mood entries
         </Text>
       </View>
     </View>
@@ -232,13 +377,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
   },
+  placeholderEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
   placeholderText: {
-    marginTop: 8,
+    fontSize: 16,
     color: '#6B7280',
     fontWeight: '500',
+    marginBottom: 4,
   },
   placeholderSubtext: {
-    marginTop: 4,
     fontSize: 12,
     color: '#9CA3AF',
     textAlign: 'center',
@@ -250,6 +399,15 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
   },
   legendTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  legendSection: {
+    marginBottom: 12,
+  },
+  legendSubtitle: {
     fontSize: 12,
     fontWeight: '600',
     color: '#6B7280',
@@ -266,24 +424,43 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   legendColor: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#6B7280',
   },
-  summary: {
+  cycleSummary: {
+    backgroundColor: '#F8F9FA',
+    padding: 12,
+    borderRadius: 8,
     marginTop: 12,
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   summaryText: {
     fontSize: 12,
     color: '#6B7280',
-    textAlign: 'center',
-    fontStyle: 'italic',
+  },
+  summary: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
 });
 
