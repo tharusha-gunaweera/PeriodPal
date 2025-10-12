@@ -171,11 +171,11 @@ export default function App() {
                 headerTitleStyle: { fontWeight: 'bold' },
               }}
             />
-            
-            
+            <Stack.Screen name="MainApp2" component={BottomTabNavigator} />
+            <Stack.Screen name="Login2" component={LoginScreen} />
           </>
         )}
-        <Stack.Screen name="Login" component={LoginScreen} />
+       
         
       </Stack.Navigator>
     </NavigationContainer>

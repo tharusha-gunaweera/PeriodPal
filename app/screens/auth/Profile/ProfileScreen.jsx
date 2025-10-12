@@ -1,22 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAuth, signOut, updateProfile, updateEmail } from 'firebase/auth';
+import { getAuth, signOut, updateEmail, updateProfile } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { db } from '../../../../FirebaseConfig';
-import { launchImageLibrary } from 'react-native-image-picker';
 
 const ProfileScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
@@ -134,7 +134,7 @@ const ProfileScreen = ({ navigation }) => {
       ]);
       
       // Use replace instead of reset to avoid navigation issues
-      navigation.replace('Login');
+      navigation.replace('Login2');
       
     } catch (error) {
       console.error('Logout error:', error);

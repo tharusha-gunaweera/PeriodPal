@@ -25,7 +25,7 @@ const LoginScreen = ({ navigation }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         await AsyncStorage.setItem('user', JSON.stringify(user));
-        navigation.navigate('MainApp');
+        navigation.navigate('MainApp2');
       }
     });
     return unsubscribe;
@@ -37,7 +37,7 @@ const LoginScreen = ({ navigation }) => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       await AsyncStorage.setItem('user', JSON.stringify(userCredential.user));
       Alert.alert('Success', 'Welcome back!');
-      navigation.replace('MainApp');
+      navigation.replace('MainApp2');
     } catch (error) {
       Alert.alert('Login Failed', error.message);
     } finally {
