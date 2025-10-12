@@ -48,7 +48,6 @@ const CycleCircle = ({
     outputRange: ['0deg', `${-currentAngle}deg`],
   });
 
-  const periodDashOffset = 0;
   const fertileDashOffset = periodArc;
   const otherDashOffset = periodArc + fertileArc;
 
@@ -97,8 +96,8 @@ const CycleCircle = ({
             r={radius}
             stroke="#ff8787"
             strokeWidth={strokeWidth}
-            strokeDasharray={`${periodArc} ${circumference}`}
-            strokeDashoffset={periodDashOffset}
+            strokeDasharray={`80 ${circumference}`}
+            strokeDashoffset={275}
             strokeLinecap="round"
             fill="none"
             origin={`${center}, ${center}`}

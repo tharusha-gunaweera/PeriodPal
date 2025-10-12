@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   formTitle: { fontSize: 22, fontWeight: 'bold', color: '#1F2937', marginBottom: 20, textAlign: 'center' },
-  nameRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  nameRow: { flexDirection: 'Column', justifyContent: 'space-between', marginBottom: 4 },
   halfInput: { flex: 0.48 },
   inputContainer: { marginBottom: 16 },
   label: { color: '#1F2937', fontWeight: '500', marginBottom: 6, fontSize: 14 },

@@ -9,7 +9,12 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Keyboard,
+    TouchableWithoutFeedback,
+    Modal,
+    Animated,
+    Dimensions
 } from 'react-native';
 import { 
     collection, 
@@ -24,6 +29,8 @@ import {
 import { getAuth } from 'firebase/auth';
 import { db } from '../../../FirebaseConfig';
 
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
+
 const CommunityChatScreen = ({ route, navigation }) => {
     const { communityId, communityName } = route.params;
     const [messages, setMessages] = useState([]);
@@ -33,20 +40,19 @@ const CommunityChatScreen = ({ route, navigation }) => {
     const [sending, setSending] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [locationLoading, setLocationLoading] = useState(false);
+    const [inputModalVisible, setInputModalVisible] = useState(false);
     
     const flatListRef = useRef();
+    const textInputRef = useRef();
+    const modalAnimation = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Get current user
+        
         const user = getAuth().currentUser;
         setCurrentUser(user);
         
         loadCommunityData();
         setupMessagesListener();
-        
-        return () => {
-            // Cleanup listener if needed
-        };
     }, [communityId]);
 
     const loadCommunityData = async () => {
@@ -90,7 +96,7 @@ const CommunityChatScreen = ({ route, navigation }) => {
                 setMessages(messagesData);
                 setLoading(false);
                 
-                // Auto-scroll to bottom when new messages arrive
+                
                 setTimeout(() => {
                     if (flatListRef.current && messagesData.length > 0) {
                         flatListRef.current.scrollToEnd({ animated: true });
@@ -132,6 +138,7 @@ const CommunityChatScreen = ({ route, navigation }) => {
             );
 
             setNewMessage('');
+            closeInputModal();
             
         } catch (error) {
             console.error('Error sending message:', error);
@@ -139,6 +146,31 @@ const CommunityChatScreen = ({ route, navigation }) => {
         } finally {
             setSending(false);
         }
+    };
+
+    const openInputModal = () => {
+        setInputModalVisible(true);
+        Animated.timing(modalAnimation, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+        }).start(() => {
+           
+            setTimeout(() => {
+                textInputRef.current?.focus();
+            }, 100);
+        });
+    };
+
+    const closeInputModal = () => {
+        Keyboard.dismiss();
+        Animated.timing(modalAnimation, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => {
+            setInputModalVisible(false);
+        });
     };
 
     const handleViewLocation = async () => {
@@ -150,21 +182,13 @@ const CommunityChatScreen = ({ route, navigation }) => {
         setLocationLoading(true);
 
         try {
-            // Check if the location data is valid
-            const { latitude, longitude, address, landmark } = community.locationPin;
+            const { latitude, longitude } = community.locationPin;
             
             if (!latitude || !longitude) {
                 Alert.alert('Error', 'Invalid location data');
                 return;
             }
 
-            console.log('Navigating to location:', {
-                communityId: community.id,
-                communityName: community.Name,
-                locationPin: community.locationPin
-            });
-
-            // Navigate to CommunityLocationView
             navigation.navigate('CommunityLocationView', {
                 communityId: community.id,
                 communityName: community.Name,
@@ -181,14 +205,12 @@ const CommunityChatScreen = ({ route, navigation }) => {
 
     const formatTime = (timestamp) => {
         if (!timestamp) return '';
-        
         const date = timestamp.toDate();
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
     const formatDate = (timestamp) => {
         if (!timestamp) return '';
-        
         const date = timestamp.toDate();
         const today = new Date();
         const yesterday = new Date(today);
@@ -210,6 +232,12 @@ const CommunityChatScreen = ({ route, navigation }) => {
 
     const isSameUser = (message1, message2) => {
         return message1.userId === message2.userId;
+    };
+
+    const scrollToBottom = () => {
+        if (flatListRef.current && messages.length > 0) {
+            flatListRef.current.scrollToEnd({ animated: true });
+        }
     };
 
     const renderMessage = ({ item, index }) => {
@@ -236,7 +264,6 @@ const CommunityChatScreen = ({ route, navigation }) => {
 
         return (
             <View>
-                {/* Date Separator */}
                 {showDate && (
                     <View style={styles.dateSeparator}>
                         <Text style={styles.dateSeparatorText}>
@@ -249,7 +276,6 @@ const CommunityChatScreen = ({ route, navigation }) => {
                     styles.messageContainer,
                     isMyMessage ? styles.myMessage : styles.otherMessage
                 ]}>
-                    {/* Avatar for other users */}
                     {!isMyMessage && showAvatar && (
                         <View style={styles.avatar}>
                             <Text style={styles.avatarText}>
@@ -259,7 +285,6 @@ const CommunityChatScreen = ({ route, navigation }) => {
                     )}
 
                     <View style={styles.messageContent}>
-                        {/* Username for other users */}
                         {!isMyMessage && showAvatar && (
                             <Text style={styles.userName}>{item.userName}</Text>
                         )}
@@ -281,13 +306,28 @@ const CommunityChatScreen = ({ route, navigation }) => {
                         </Text>
                     </View>
 
-                    {/* Spacer for alignment */}
                     {!isMyMessage && !showAvatar && (
                         <View style={styles.avatarSpacer} />
                     )}
                 </View>
             </View>
         );
+    };
+
+    // Modal animation styles
+    const modalBackgroundStyle = {
+        opacity: modalAnimation,
+    };
+
+    const modalContentStyle = {
+        transform: [
+            {
+                translateY: modalAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [screenHeight, 0],
+                }),
+            },
+        ],
     };
 
     if (!community) {
@@ -300,11 +340,7 @@ const CommunityChatScreen = ({ route, navigation }) => {
     }
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
+        <View style={styles.container}>
             {/* Community Header */}
             <View style={styles.communityHeader}>
                 <Text style={styles.communityEmoji}>{community.image || '👥'}</Text>
@@ -344,42 +380,83 @@ const CommunityChatScreen = ({ route, navigation }) => {
                     style={styles.messagesList}
                     contentContainerStyle={styles.messagesContainer}
                     showsVerticalScrollIndicator={false}
-                    onContentSizeChange={() => {
-                        if (flatListRef.current && messages.length > 0) {
-                            flatListRef.current.scrollToEnd({ animated: false });
-                        }
-                    }}
+                    onContentSizeChange={scrollToBottom}
+                    onLayout={scrollToBottom}
                 />
             )}
 
-            {/* Message Input */}
-            <View style={styles.inputContainer}>
-                <TextInput
-                    style={styles.textInput}
-                    placeholder="Type a message..."
-                    placeholderTextColor="#9CA3AF"
-                    value={newMessage}
-                    onChangeText={setNewMessage}
-                    multiline
-                    maxLength={500}
-                    editable={!sending}
-                />
-                <TouchableOpacity
-                    style={[
-                        styles.sendButton, 
-                        (!newMessage.trim() || sending) && styles.sendButtonDisabled
-                    ]}
-                    onPress={handleSendMessage}
-                    disabled={!newMessage.trim() || sending}
-                >
-                    {sending ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                        <Text style={styles.sendButtonText}>Send</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
-        </KeyboardAvoidingView>
+            {/* Fixed Input Button at Bottom */}
+            <TouchableOpacity 
+                style={styles.openInputButton}
+                onPress={openInputModal}
+            >
+                <Text style={styles.openInputButtonText}>Type a message...</Text>
+            </TouchableOpacity>
+
+            {/* Modal Input */}
+            <Modal
+                visible={inputModalVisible}
+                transparent={true}
+                animationType="none"
+                onRequestClose={closeInputModal}
+            >
+                <TouchableWithoutFeedback onPress={closeInputModal}>
+                    <Animated.View style={[styles.modalOverlay, modalBackgroundStyle]}>
+                        <TouchableWithoutFeedback>
+                            <Animated.View style={[styles.modalContent, modalContentStyle]}>
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>New Message</Text>
+                                    <TouchableOpacity 
+                                        style={styles.closeButton}
+                                        onPress={closeInputModal}
+                                    >
+                                        <Text style={styles.closeButtonText}>✕</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                
+                                <TextInput
+                                    ref={textInputRef}
+                                    style={styles.modalTextInput}
+                                    placeholder="Type your message here..."
+                                    placeholderTextColor="#9CA3AF"
+                                    value={newMessage}
+                                    onChangeText={setNewMessage}
+                                    multiline
+                                    maxLength={500}
+                                    editable={!sending}
+                                    autoFocus={true}
+                                    blurOnSubmit={false}
+                                />
+                                
+                                <View style={styles.modalActions}>
+                                    <TouchableOpacity 
+                                        style={styles.cancelButton}
+                                        onPress={closeInputModal}
+                                    >
+                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                    
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.sendButton, 
+                                            (!newMessage.trim() || sending) && styles.sendButtonDisabled
+                                        ]}
+                                        onPress={handleSendMessage}
+                                        disabled={!newMessage.trim() || sending}
+                                    >
+                                        {sending ? (
+                                            <ActivityIndicator color="#FFFFFF" size="small" />
+                                        ) : (
+                                            <Text style={styles.sendButtonText}>Send</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </Animated.View>
+                        </TouchableWithoutFeedback>
+                    </Animated.View>
+                </TouchableWithoutFeedback>
+            </Modal>
+        </View>
     );
 };
 
@@ -452,7 +529,7 @@ const styles = StyleSheet.create({
     },
     messagesContainer: {
         padding: 16,
-        paddingBottom: 8,
+        paddingBottom: 80, // Extra space for the input button
     },
     dateSeparator: {
         alignItems: 'center',
@@ -568,43 +645,113 @@ const styles = StyleSheet.create({
         marginLeft: 12,
         marginBottom: 8,
     },
-    inputContainer: {
-        flexDirection: 'row',
-        padding: 16,
+    // Fixed Input Button
+    openInputButton: {
+        position: 'absolute',
+        bottom: 20,
+        left: 20,
+        right: 20,
         backgroundColor: '#FFFFFF',
-        borderTopWidth: 1,
-        borderTopColor: '#E5E7EB',
-        alignItems: 'flex-end',
-    },
-    textInput: {
-        flex: 1,
+        borderRadius: 25,
+        paddingVertical: 15,
+        paddingHorizontal: 20,
         borderWidth: 1,
         borderColor: '#E5E7EB',
-        borderRadius: 24,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        marginRight: 12,
-        maxHeight: 100,
-        backgroundColor: '#F9FAFB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    openInputButtonText: {
+        color: '#9CA3AF',
         fontSize: 16,
+        textAlign: 'center',
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        width: '100%',
+        maxHeight: screenHeight * 0.6,
+        padding: 0,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
         color: '#1F2937',
     },
-    sendButton: {
-        backgroundColor: '#EC4899',
-        borderRadius: 24,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        minWidth: 60,
+    closeButton: {
+        padding: 5,
+    },
+    closeButtonText: {
+        fontSize: 20,
+        color: '#6B7280',
+        fontWeight: 'bold',
+    },
+    modalTextInput: {
+        minHeight: 120,
+        maxHeight: 200,
+        padding: 20,
+        fontSize: 16,
+        color: '#1F2937',
+        textAlignVertical: 'top',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 20,
+        gap: 12,
+    },
+    cancelButton: {
+        flex: 1,
+        paddingVertical: 15,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
         alignItems: 'center',
-        justifyContent: 'center',
+    },
+    cancelButtonText: {
+        color: '#6B7280',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    sendButton: {
+        flex: 1,
+        paddingVertical: 15,
+        backgroundColor: '#EC4899',
+        borderRadius: 12,
+        alignItems: 'center',
     },
     sendButtonDisabled: {
         backgroundColor: '#9CA3AF',
+        opacity: 0.6,
     },
     sendButtonText: {
         color: '#FFFFFF',
-        fontWeight: 'bold',
         fontSize: 16,
+        fontWeight: 'bold',
     },
 });
 

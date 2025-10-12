@@ -418,7 +418,7 @@ const PaymentScreen = ({ route, navigation }) => {
               />
             </View>
 
-            <View style={styles.row}>
+            
               <View style={[styles.inputContainer, styles.halfInput]}>
                 <Text style={styles.label}>State/Province</Text>
                 <TextInput
@@ -443,7 +443,7 @@ const PaymentScreen = ({ route, navigation }) => {
                 />
               </View>
             </View>
-          </View>
+          
 
           <TouchableOpacity
             style={[styles.payButton, loading && styles.payButtonDisabled]}

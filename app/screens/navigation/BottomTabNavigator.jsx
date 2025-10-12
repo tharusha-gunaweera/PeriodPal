@@ -6,8 +6,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // Import your actual screens - UPDATE THESE IMPORTS
 import CommunityMemberScreen from '../Community/CommunityMemberScreen';
-import Home from '../Tracker/Home';
 import ShopScreen from '../MenstrualSup/ShopScreen'; // Import your Products/Shop screen
+import Home from '../Tracker/Home';
 import ProfileScreen from '../auth/Profile/ProfileScreen'; // Import your Profile/Account screen
 
 const Tab = createBottomTabNavigator();
@@ -103,13 +103,14 @@ export default function BottomTabNavigator() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
-          height: 60,
-          paddingBottom: 8,
+          height: 85, // Increased height even more
+          paddingBottom: 25, // Significantly increased bottom padding
           paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '500',
+          marginBottom: 10, // Increased margin below labels even more
         },
         headerStyle: {
           backgroundColor: '#EC4899',

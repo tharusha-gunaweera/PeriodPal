@@ -835,8 +835,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
   },
   halfInput: {
     flex: 0.48,

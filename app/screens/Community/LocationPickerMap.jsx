@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import * as Location from 'expo-location';
+import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
     Alert,
+    Image,
     Modal,
     ScrollView,
-    Image
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import MapView, { Marker, Callout, Polyline } from 'react-native-maps';
-import * as Location from 'expo-location';
+import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 
 // Enhanced landmark data with photos, demand data, and detailed information
 const predefinedDeliveries = [
@@ -21,10 +21,10 @@ const predefinedDeliveries = [
         address: 'No. 123, Galle Road, Colombo 03, Sri Lanka',
         type: 'landmark',
         landmark: 'Colombo City Center',
-        description: 'Large shopping complex with multiple access points. Main delivery at security desk near entrance 2.',
+        description: 'Two families that lives for 10 years in this bangalow requires menstrual products tht enough for a month. Make your valuable delivery',
         photos: [
-            { id: 1, uri: 'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?w=400&h=300&fit=crop', description: 'Main entrance with security' },
-            { id: 2, uri: 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=400&h=300&fit=crop', description: 'Delivery area near entrance 2' }
+            { id: 1, uri: 'https://i.pinimg.com/736x/67/83/2c/67832cb660e193de763e3691c73300c5.jpg', description: 'Main entrance with security' },
+            { id: 2, uri: 'https://i.pinimg.com/736x/dd/d2/d0/ddd2d085cb8adfeba304cad5e45f4975.jpg', description: 'Delivery area near entrance 2' }
         ],
         demand: {
             peopleWaiting: 15,
@@ -41,10 +41,10 @@ const predefinedDeliveries = [
         address: 'No. 45, Temple Road, Kandy 20000, Sri Lanka',
         type: 'landmark',
         landmark: 'Kandy City Center',
-        description: 'Central city location near Temple of the Tooth. Delivery point at the community center.',
+        description: 'Central city location near Temple of the Tooth Family is waiting for your valuable deliveries.',
         photos: [
-            { id: 1, uri: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400&h=300&fit=crop', description: 'Community center building' },
-            { id: 2, uri: 'https://images.unsplash.com/photo-1574362848142-d312d3bf8deb?w=400&h=300&fit=crop', description: 'Main delivery entrance' }
+            { id: 1, uri: 'https://images.unsplash.com/photo-1751486877474-a58e3390d398?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=764', description: 'Community center building' },
+            { id: 2, uri: 'https://images.unsplash.com/photo-1718134840922-53c040c33552?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1168', description: 'Main delivery entrance' }
         ],
         demand: {
             peopleWaiting: 8,
@@ -61,14 +61,14 @@ const predefinedDeliveries = [
         address: 'No. 78, Church Street, Galle Fort 80000, Sri Lanka',
         type: 'landmark',
         landmark: 'Galle Fort Heritage',
-        description: 'Historic UNESCO site with colonial architecture. Delivery at the heritage community hall.',
+        description: 'Students in an Old school situated in Galle.Are waiting for your valuable donation',
         photos: [
-            { id: 1, uri: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&h=300&fit=crop', description: 'Heritage community hall' },
-            { id: 2, uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=300&fit=crop', description: 'Main courtyard entrance' }
+            { id: 1, uri: 'https://i.pinimg.com/736x/19/71/ba/1971badb94b652c6ed479016abb5bed8.jpg', description: 'Heritage community hall' },
+            { id: 2, uri: 'https://i.pinimg.com/1200x/90/fb/4d/90fb4dfb27f876bec957124bf857d6bb.jpg', description: 'Main courtyard entrance' }
         ],
         demand: {
-            peopleWaiting: 12,
-            productsRequired: 32,
+            peopleWaiting: 50,
+            productsRequired: 200,
             urgency: 'High',
             commonProducts: ['Regular Pads', 'Pantyliners', 'Period Panties']
         },
@@ -81,10 +81,10 @@ const predefinedDeliveries = [
         address: 'No. 56, Beach Road, Negombo 11500, Sri Lanka',
         type: 'landmark',
         landmark: 'Negombo Beach Community',
-        description: 'Beachside community center serving coastal residents and tourists.',
+        description: 'Beach side family requires. Menstural products that enough for a month. Make your valuable delivery.',
         photos: [
-            { id: 1, uri: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop', description: 'Beach community center' },
-            { id: 2, uri: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&h=300&fit=crop', description: 'Main delivery point' }
+            { id: 1, uri: 'https://images.unsplash.com/photo-1749655048206-71ea213bd8f4?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=764', description: 'Beach community center' },
+            { id: 2, uri: 'https://images.unsplash.com/photo-1669123547600-28b2a1b6582d?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1171', description: 'Main delivery point' }
         ],
         demand: {
             peopleWaiting: 6,
