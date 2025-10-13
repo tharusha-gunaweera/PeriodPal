@@ -3,18 +3,17 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 
 const CalendarComponent = ({ data, cycleData }) => {
-  console.log('Calendar data received:', data?.length, 'entries');
-  console.log('Cycle data for calendar:', cycleData);
+  console.log('📅 Calendar data received:', data?.length, 'entries');
+  console.log('📅 Cycle data for calendar:', cycleData);
 
   const getPeriodAndFertileDays = () => {
     if (!cycleData || !cycleData.lastPeriodDate) {
-      console.log('No cycle data available for predictions');
+      console.log('❌ No cycle data available for predictions');
       return { periodDays: [], fertileDays: [] };
     }
 
     const { 
       lastPeriodDate, 
-      totalDays, 
       periodDays, 
       fertileStartDay, 
       fertileEndDay,
@@ -25,38 +24,27 @@ const CalendarComponent = ({ data, cycleData }) => {
     const periodDates = [];
     const fertileDates = [];
 
-    console.log('Last period date:', lastPeriodDate.toLocaleDateString());
-    console.log('Next period date:', nextPeriodDate?.toLocaleDateString());
-    console.log('Previous period date:', previousPeriodDate?.toLocaleDateString());
-    console.log('Total cycle days:', totalDays);
-    console.log('Period days:', periodDays);
-    console.log('Fertile window:', fertileStartDay, '-', fertileEndDay);
+    console.log('🩸 PERIOD CALCULATION DEBUG:');
+    console.log('- Last period date:', lastPeriodDate.toLocaleDateString());
+    console.log('- Period duration (days):', periodDays);
+    console.log('- Next period date:', nextPeriodDate?.toLocaleDateString());
+    console.log('- Previous period date:', previousPeriodDate?.toLocaleDateString());
 
-    // 🩸 FIXED: Calculate LAST period dates
+    // 🩸 FIXED: Calculate LAST period dates (CURRENT period)
     if (lastPeriodDate) {
+      console.log('🩸 Calculating CURRENT period dates:');
       for (let i = 0; i < periodDays; i++) {
         const periodDate = new Date(lastPeriodDate);
         periodDate.setDate(lastPeriodDate.getDate() + i);
         const dateString = periodDate.toISOString().split('T')[0];
         periodDates.push(dateString);
+        console.log(`  Day ${i+1}: ${dateString}`);
       }
     }
 
-    // 🩸 FIXED: Calculate NEXT period dates (predicted)
-    if (nextPeriodDate) {
-      for (let i = 0; i < periodDays; i++) {
-        const periodDate = new Date(nextPeriodDate);
-        periodDate.setDate(nextPeriodDate.getDate() + i);
-        const dateString = periodDate.toISOString().split('T')[0];
-        // Only add if not already in the array
-        if (!periodDates.includes(dateString)) {
-          periodDates.push(dateString);
-        }
-      }
-    }
-
-    // 🩸 FIXED: Calculate PREVIOUS period dates (for complete history)
+    // 🩸 FIXED: Calculate PREVIOUS period dates
     if (previousPeriodDate) {
+      console.log('🩸 Calculating PREVIOUS period dates:');
       for (let i = 0; i < periodDays; i++) {
         const periodDate = new Date(previousPeriodDate);
         periodDate.setDate(previousPeriodDate.getDate() + i);
@@ -64,35 +52,55 @@ const CalendarComponent = ({ data, cycleData }) => {
         // Only add if not already in the array
         if (!periodDates.includes(dateString)) {
           periodDates.push(dateString);
+          console.log(`  Day ${i+1}: ${dateString}`);
         }
       }
     }
 
-    console.log('All period dates:', periodDates);
+    // 🩸 FIXED: Calculate NEXT period dates (predicted)
+    if (nextPeriodDate) {
+      console.log('🩸 Calculating NEXT period dates:');
+      for (let i = 0; i < periodDays; i++) {
+        const periodDate = new Date(nextPeriodDate);
+        periodDate.setDate(nextPeriodDate.getDate() + i);
+        const dateString = periodDate.toISOString().split('T')[0];
+        // Only add if not already in the array
+        if (!periodDates.includes(dateString)) {
+          periodDates.push(dateString);
+          console.log(`  Day ${i+1}: ${dateString}`);
+        }
+      }
+    }
+
+    console.log('✅ FINAL PERIOD DATES:', periodDates);
 
     // 🎯 Calculate fertile days for current cycle
     if (lastPeriodDate) {
+      console.log('🎯 Calculating CURRENT fertile window:');
       for (let i = fertileStartDay - 1; i < fertileEndDay; i++) {
         const fertileDate = new Date(lastPeriodDate);
         fertileDate.setDate(lastPeriodDate.getDate() + i);
         const dateString = fertileDate.toISOString().split('T')[0];
         fertileDates.push(dateString);
+        console.log(`  Fertile Day ${i+1}: ${dateString}`);
       }
     }
 
     // 🎯 Calculate fertile days for next cycle
     if (nextPeriodDate) {
+      console.log('🎯 Calculating NEXT fertile window:');
       for (let i = fertileStartDay - 1; i < fertileEndDay; i++) {
         const fertileDate = new Date(nextPeriodDate);
         fertileDate.setDate(nextPeriodDate.getDate() + i);
         const dateString = fertileDate.toISOString().split('T')[0];
         if (!fertileDates.includes(dateString)) {
           fertileDates.push(dateString);
+          console.log(`  Fertile Day ${i+1}: ${dateString}`);
         }
       }
     }
 
-    console.log('All fertile dates:', fertileDates);
+    console.log('✅ FINAL FERTILE DATES:', fertileDates);
 
     return {
       periodDays: periodDates,
@@ -104,8 +112,10 @@ const CalendarComponent = ({ data, cycleData }) => {
     const markedDates = {};
     const { periodDays, fertileDays } = getPeriodAndFertileDays();
 
-    console.log('🎯 Marking period days:', periodDays.length);
-    console.log('🎯 Marking fertile days:', fertileDays.length);
+    console.log('🎯 FINAL MARKING:');
+    console.log('- Period days to mark:', periodDays.length);
+    console.log('- Fertile days to mark:', fertileDays.length);
+    console.log('- Sample period dates:', periodDays.slice(0, 5));
 
     // 🩸 Mark PERIOD days (pink background)
     periodDays.forEach(date => {
@@ -164,6 +174,7 @@ const CalendarComponent = ({ data, cycleData }) => {
 
     // 📝 Add user tracking data (dots for bleeding and moods)
     if (data && data.length > 0) {
+      console.log('📝 Adding user tracking data dots...');
       data.forEach(entry => {
         if (entry.date) {
           let dotColor = '#E5E7EB';
@@ -181,6 +192,9 @@ const CalendarComponent = ({ data, cycleData }) => {
                 break;
               case 'spotting':
                 dotColor = '#FFE4E1';
+                break;
+              case 'none':
+                dotColor = '#E5E7EB';
                 break;
               default:
                 dotColor = '#E5E7EB';
@@ -236,6 +250,7 @@ const CalendarComponent = ({ data, cycleData }) => {
 
     // 🔵 Mark TODAY with special styling
     const today = new Date().toISOString().split('T')[0];
+    console.log('📅 Today is:', today);
     if (markedDates[today]) {
       markedDates[today] = {
         ...markedDates[today],
@@ -265,10 +280,11 @@ const CalendarComponent = ({ data, cycleData }) => {
       };
     }
 
-    console.log('✅ Total marked dates:', Object.keys(markedDates).length);
+    console.log('✅ FINAL: Total marked dates:', Object.keys(markedDates).length);
     return markedDates;
   };
 
+  // Configure calendar locale
   LocaleConfig.locales['en'] = {
     monthNames: [
       'January', 'February', 'March', 'April', 'May', 'June',

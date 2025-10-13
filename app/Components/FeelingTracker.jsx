@@ -35,6 +35,7 @@ const FeelingTracker = ({ visible, onClose, onSave }) => {
   ];
 
   const handleBleedingSelect = (bleeding) => {
+    console.log('🩸 Selected bleeding:', bleeding);
     setSelectedBleeding(bleeding);
   };
 
@@ -57,11 +58,18 @@ const FeelingTracker = ({ visible, onClose, onSave }) => {
     const feelingData = {
       bleeding: selectedBleeding,
       moods: selectedMoods,
-      date: new Date().toISOString(),
+      date: new Date().toISOString().split('T')[0], // Ensure date format is correct
       timestamp: Date.now()
     };
 
+    console.log('💾 Saving feeling data:', feelingData);
     onSave(feelingData);
+    setSelectedBleeding(null);
+    setSelectedMoods([]);
+    onClose();
+  };
+
+  const handleClose = () => {
     setSelectedBleeding(null);
     setSelectedMoods([]);
     onClose();
@@ -72,7 +80,7 @@ const FeelingTracker = ({ visible, onClose, onSave }) => {
       visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
@@ -136,7 +144,7 @@ const FeelingTracker = ({ visible, onClose, onSave }) => {
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={onClose}
+              onPress={handleClose}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>

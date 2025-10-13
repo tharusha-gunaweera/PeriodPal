@@ -62,7 +62,8 @@ export default function Home({ navigation }) {
       const newFeeling = {
         ...feelingData,
         id: Date.now().toString(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        date: new Date().toISOString().split('T')[0] // Ensure date is set
       };
 
       // Get existing data
@@ -83,7 +84,7 @@ export default function Home({ navigation }) {
     }
   };
 
-  // 🎯 ACCURATE: Process user data with real cycle calculations
+  // 🎯 FIXED: Process user data with accurate cycle calculations
   const processUserData = (feelingsData) => {
     console.log('Processing user data for cycle prediction...');
     
@@ -109,14 +110,20 @@ export default function Home({ navigation }) {
       console.log('Cycle data calculated:', cycleInfo);
     } else {
       // Set default cycle data for new users
+      const today = new Date();
+      const nextPeriodDate = new Date(today);
+      nextPeriodDate.setDate(today.getDate() + 28);
+      const previousPeriodDate = new Date(today);
+      previousPeriodDate.setDate(today.getDate() - 28);
+      
       setCycleData({
         periodDays: 5,
         fertileDays: 6,
         totalDays: 28,
         currentDay: 1,
         daysUntilNextPeriod: 28,
-        nextPeriodDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000),
-        previousPeriodDate: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000),
+        nextPeriodDate: nextPeriodDate,
+        previousPeriodDate: previousPeriodDate,
         fertileStartDay: 10,
         fertileEndDay: 16,
         isFertile: false,
@@ -131,21 +138,25 @@ export default function Home({ navigation }) {
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
     
-    console.log('Today:', today.toLocaleDateString());
+    console.log('🔴 CYCLE CALCULATION - Today:', today.toLocaleDateString());
 
     // Get all period days (bleeding that's not 'none') sorted by date
     const periodDays = feelingsData
       .filter(f => f.bleeding && f.bleeding.id !== 'none')
       .sort((a, b) => a.timestamp - b.timestamp);
 
-    console.log('Period days found:', periodDays.length);
+    console.log('🔴 Period days found:', periodDays.length);
+    periodDays.forEach((p, i) => {
+      console.log(`  ${i+1}. ${new Date(p.timestamp).toLocaleDateString()} - ${p.bleeding.label}`);
+    });
 
     if (periodDays.length === 0) {
+      console.log('🔴 No period data found - using default');
       // No period data available - use default 28-day cycle
       const nextPeriodDate = new Date(todayStart + 28 * 24 * 60 * 60 * 1000);
       const previousPeriodDate = new Date(todayStart - 28 * 24 * 60 * 60 * 1000);
       return {
-        periodDays: 5,
+        periodDays: 5, // Default to 5 days
         fertileDays: 6,
         totalDays: 28,
         currentDay: 1,
@@ -160,89 +171,62 @@ export default function Home({ navigation }) {
       };
     }
 
-    // Calculate average cycle length from historical data
-    let cycleLengths = [];
-    for (let i = 1; i < periodDays.length; i++) {
-      const daysBetween = Math.round(
-        (periodDays[i].timestamp - periodDays[i-1].timestamp) / (1000 * 60 * 60 * 24)
-      );
-      
-      if (daysBetween >= 21 && daysBetween <= 35) {
-        cycleLengths.push(daysBetween);
-      }
-    }
-
-    const avgCycleLength = cycleLengths.length > 0 
-      ? Math.round(cycleLengths.reduce((a, b) => a + b) / cycleLengths.length)
-      : 28;
-
     const lastPeriod = periodDays[periodDays.length - 1];
     const lastPeriodDate = new Date(lastPeriod.timestamp);
     
-    // 🎯 FIXED: Calculate current cycle day based on last period and today
+    console.log('🔴 Last period date:', lastPeriodDate.toLocaleDateString());
+    
+    // Calculate days since last period
     const daysSinceLastPeriod = Math.floor(
       (todayStart - lastPeriodDate.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    const currentDay = (daysSinceLastPeriod % avgCycleLength) + 1;
-    const daysUntilNextPeriod = avgCycleLength - daysSinceLastPeriod;
+    console.log('🔴 Days since last period:', daysSinceLastPeriod);
+
+    // Use default 28-day cycle for calculation
+    const cycleLength = 28;
+    const currentDay = (daysSinceLastPeriod % cycleLength) + 1;
+    const daysUntilNextPeriod = cycleLength - daysSinceLastPeriod;
     
-    // 🎯 FIXED: Calculate next period date
+    // Calculate next period date
     const nextPeriodDate = new Date(lastPeriodDate);
-    nextPeriodDate.setDate(lastPeriodDate.getDate() + avgCycleLength);
+    nextPeriodDate.setDate(lastPeriodDate.getDate() + cycleLength);
     
-    // 🎯 FIXED: Calculate previous period date for complete cycle visualization
+    // Calculate previous period date
     const previousPeriodDate = new Date(lastPeriodDate);
-    previousPeriodDate.setDate(lastPeriodDate.getDate() - avgCycleLength);
+    previousPeriodDate.setDate(lastPeriodDate.getDate() - cycleLength);
     
-    // 🎯 FIXED: Fertile window (typically days 10-16 of cycle)
+    // Fertile window (typically days 10-16 of cycle)
     const fertileStartDay = 10;
     const fertileEndDay = 16;
     const isFertile = currentDay >= fertileStartDay && currentDay <= fertileEndDay;
 
-    // Calculate average period length from historical data
-    const periodLengths = [];
-    let currentPeriod = [];
-    
-    for (let i = 0; i < periodDays.length; i++) {
-      if (i === 0 || periodDays[i].timestamp - periodDays[i-1].timestamp <= 2 * 24 * 60 * 60 * 1000) {
-        currentPeriod.push(periodDays[i]);
-      } else {
-        if (currentPeriod.length > 0) {
-          periodLengths.push(currentPeriod.length);
-        }
-        currentPeriod = [periodDays[i]];
-      }
-    }
-    if (currentPeriod.length > 0) {
-      periodLengths.push(currentPeriod.length);
-    }
-    
-    const avgPeriodDays = periodLengths.length > 0 
-      ? Math.round(periodLengths.reduce((a, b) => a + b) / periodLengths.length)
-      : 5;
+    // 🩸 FIXED: Always use 5 days for period duration
+    const periodDuration = 5;
 
-    console.log('Cycle calculation complete:');
-    console.log('- Current day:', currentDay);
-    console.log('- Total days:', avgCycleLength);
-    console.log('- Period days:', avgPeriodDays);
-    console.log('- Fertile window:', fertileStartDay, '-', fertileEndDay);
+    console.log('✅ FINAL CYCLE DATA:');
+    console.log('- Period days:', periodDuration);
+    console.log('- Current cycle day:', currentDay);
+    console.log('- Total cycle days:', cycleLength);
+    console.log('- Days until next period:', daysUntilNextPeriod);
     console.log('- Last period:', lastPeriodDate.toLocaleDateString());
     console.log('- Next period:', nextPeriodDate.toLocaleDateString());
     console.log('- Previous period:', previousPeriodDate.toLocaleDateString());
+    console.log('- Fertile window:', fertileStartDay, '-', fertileEndDay);
+    console.log('- Is fertile:', isFertile);
 
     return {
-      periodDays: avgPeriodDays,
+      periodDays: periodDuration, // 🩸 FIXED: Always 5 days
       fertileDays: fertileEndDay - fertileStartDay + 1,
-      totalDays: avgCycleLength,
-      currentDay: Math.max(1, Math.min(currentDay, avgCycleLength)),
+      totalDays: cycleLength,
+      currentDay: Math.max(1, Math.min(currentDay, cycleLength)),
       daysUntilNextPeriod: Math.max(0, daysUntilNextPeriod),
       nextPeriodDate: nextPeriodDate,
       previousPeriodDate: previousPeriodDate,
       fertileStartDay: fertileStartDay,
       fertileEndDay: fertileEndDay,
       isFertile: isFertile,
-      isPrediction: cycleLengths.length > 0,
+      isPrediction: periodDays.length > 0,
       lastPeriodDate: lastPeriodDate
     };
   };
@@ -264,6 +248,28 @@ export default function Home({ navigation }) {
     };
     
     return moodEmojis[moods[0]] || '😐';
+  };
+
+  // Debug function to check cycle data
+  const debugCycleData = () => {
+    console.log('🔴 DEBUG CYCLE DATA:');
+    console.log('User data length:', userData.length);
+    
+    // Find all bleeding entries
+    const bleedingEntries = userData.filter(f => f.bleeding && f.bleeding.id !== 'none');
+    console.log('Bleeding entries:', bleedingEntries.length);
+    
+    if (bleedingEntries.length > 0) {
+      const lastBleeding = bleedingEntries[bleedingEntries.length - 1];
+      console.log('Last bleeding entry:', lastBleeding);
+      console.log('Last bleeding date:', new Date(lastBleeding.timestamp).toLocaleDateString());
+    }
+    
+    console.log('Current cycleData:', cycleData);
+    Alert.alert(
+      'Cycle Data Debug', 
+      `Period Days: ${cycleData?.periodDays}\nLast Period: ${cycleData?.lastPeriodDate?.toLocaleDateString()}\nBleeding Entries: ${bleedingEntries.length}`
+    );
   };
 
   // Clear all data (for testing)
@@ -337,6 +343,9 @@ export default function Home({ navigation }) {
                 🔄 Day: {cycleData.currentDay}/{cycleData.totalDays}
               </Text>
               <Text style={styles.debugText}>
+                🩸 Period Days: {cycleData.periodDays}
+              </Text>
+              <Text style={styles.debugText}>
                 ⏳ Next Period: {cycleData.daysUntilNextPeriod} days
               </Text>
               {cycleData.lastPeriodDate && (
@@ -347,9 +356,14 @@ export default function Home({ navigation }) {
             </>
           )}
         </View>
-        <TouchableOpacity onPress={clearAllData} style={styles.clearButton}>
-          <Text style={styles.clearButtonText}>Clear Data</Text>
-        </TouchableOpacity>
+        <View style={styles.debugButtons}>
+          <TouchableOpacity onPress={debugCycleData} style={[styles.debugButton, {backgroundColor: '#8B5CF6'}]}>
+            <Text style={styles.debugButtonText}>Debug Cycle</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={clearAllData} style={[styles.debugButton, {backgroundColor: '#EF4444'}]}>
+            <Text style={styles.debugButtonText}>Clear Data</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Show content if user has tracking data */}
@@ -551,14 +565,16 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     marginBottom: 4,
   },
-  clearButton: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+  debugButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  clearButtonText: {
+  debugButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  debugButtonText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '500',
@@ -688,4 +704,3 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 });
-
