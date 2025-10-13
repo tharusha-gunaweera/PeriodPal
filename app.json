@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PeriodPal",
-    "slug": "PeriodPal",
+    "slug": "PeriodPal",  
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -31,6 +31,7 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
