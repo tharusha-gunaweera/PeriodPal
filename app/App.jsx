@@ -140,7 +140,7 @@ export default function App() {
               name="PaymentScreen"
               component={PaymentScreen}
               options={{
-                title: 'Make a Donation',
+                title: 'Proceed payment',
                 headerShown: true,
                 headerStyle: { backgroundColor: '#EC4899' },
                 headerTintColor: '#FFFFFF',
@@ -151,7 +151,7 @@ export default function App() {
               name="RequestItemScreen"
               component={RequestItemScreen}
               options={{
-                title: 'Make a Donation',
+                title: 'Request Items',
                 headerShown: true,
                 headerStyle: { backgroundColor: '#EC4899' },
                 headerTintColor: '#FFFFFF',
